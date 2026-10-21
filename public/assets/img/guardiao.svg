@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28" shape-rendering="crispEdges" role="img" aria-label="Guardião da Floresta em pixel art">
+  <rect x="3" y="1" width="2" height="4" fill="#593617"/>
+  <rect x="5" y="3" width="3" height="2" fill="#2e7d4f"/>
+  <rect x="23" y="1" width="2" height="4" fill="#593617"/>
+  <rect x="20" y="3" width="3" height="2" fill="#2e7d4f"/>
+  <rect x="7" y="5" width="14" height="4" fill="#593617"/>
+  <rect x="10" y="4" width="8" height="1" fill="#2e7d4f"/>
+  <rect x="6" y="9" width="16" height="12" fill="#422912"/>
+  <rect x="5" y="11" width="1" height="8" fill="#321f0d"/>
+  <rect x="22" y="11" width="1" height="8" fill="#321f0d"/>
+  <rect x="8" y="11" width="3" height="3" fill="#ffd23f"/>
+  <rect x="9" y="12" width="1" height="1" fill="#ffffff"/>
+  <rect x="17" y="11" width="3" height="3" fill="#ffd23f"/>
+  <rect x="18" y="12" width="1" height="1" fill="#ffffff"/>
+  <rect x="13" y="13" width="2" height="4" fill="#38cfb8"/>
+  <rect x="11" y="15" width="6" height="1" fill="#38cfb8"/>
+  <rect x="10" y="18" width="8" height="2" fill="#1d2340"/>
+  <rect x="4" y="19" width="4" height="6" fill="#593617"/>
+  <rect x="20" y="19" width="4" height="6" fill="#593617"/>
+  <rect x="8" y="21" width="12" height="5" fill="#321f0d"/>
+  <rect x="6" y="26" width="5" height="2" fill="#593617"/>
+  <rect x="17" y="26" width="5" height="2" fill="#593617"/>
+</svg>
