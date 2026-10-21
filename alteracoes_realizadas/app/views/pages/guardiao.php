@@ -681,9 +681,9 @@ if ($partidaAtiva) {
             <article class="card resultado-card">
                 <div class="resultado-vencedor-destaque">
                     <?php if ($vidasJogador > 0 && $acertos >= $erros): ?>
-                        <span class="pixel-avatar-grande avatar-cacador" aria-hidden="true"></span>
+                        <span class="pixel-avatar-grande avatar-bico-armadura" aria-hidden="true"></span>
                     <?php else: ?>
-                        <span class="pixel-avatar-grande avatar-guardiao" aria-hidden="true"></span>
+                        <span class="pixel-avatar-grande avatar-guardiao-floresta" aria-hidden="true"></span>
                     <?php endif; ?>
                     <h3><?= htmlspecialchars($resultado ?? 'Batalha encerrada', ENT_QUOTES, 'UTF-8') ?></h3>
                 </div>
@@ -722,14 +722,14 @@ if ($partidaAtiva) {
             <div class="arena-batalha-container card">
                 <div class="arena-duelo-grid">
                     
-                    <!-- LADO DO JOGADOR (CAÇADOR) -->
+                    <!-- LADO DO JOGADOR (BICÓ COM ARMADURA) -->
                     <div class="lutador-card lutador-jogador">
                         <div class="lutador-avatar-wrap">
-                            <span class="pixel-avatar-luta avatar-cacador" aria-hidden="true"></span>
+                            <span class="pixel-avatar-luta avatar-bico-armadura" aria-hidden="true"></span>
                         </div>
                         <div class="lutador-info">
-                            <span class="badge-lutador">HERÓI DO REINO</span>
-                            <h4 class="lutador-nome"><?= htmlspecialchars($_SESSION['aluno_nome'] ?? 'Caçador', ENT_QUOTES, 'UTF-8') ?></h4>
+                            <span class="badge-lutador">BICÓ GUERREIRO</span>
+                            <h4 class="lutador-nome"><?= htmlspecialchars($_SESSION['aluno_nome'] ?? 'Herói do Reino', ENT_QUOTES, 'UTF-8') ?></h4>
                             
                             <!-- CORAÇÕES DE VIDA GRANDES EM PIXEL ART -->
                             <div class="vidas-container-grande" aria-label="Vidas do Jogador: <?= $vidasJogador ?> de 3">
@@ -747,13 +747,13 @@ if ($partidaAtiva) {
                         <div class="rodada-badge">RODADA <?= min(10, $totalQuestoes + 1) ?>/10</div>
                     </div>
 
-                    <!-- LADO DO GUARDIÃO -->
+                    <!-- LADO DO GUARDIÃO DA FLORESTA -->
                     <div class="lutador-card lutador-guardiao">
                         <div class="lutador-avatar-wrap">
-                            <span class="pixel-avatar-luta avatar-guardiao" aria-hidden="true"></span>
+                            <span class="pixel-avatar-luta avatar-guardiao-floresta" aria-hidden="true"></span>
                         </div>
                         <div class="lutador-info">
-                            <span class="badge-lutador badge-roxo">ANCESTRAL</span>
+                            <span class="badge-lutador badge-roxo">GUARDIÃO ANCESTRAL</span>
                             <h4 class="lutador-nome">Guardião da Floresta</h4>
                             
                             <!-- ESCUDOS MÍSTICOS GRANDES EM PIXEL ART -->

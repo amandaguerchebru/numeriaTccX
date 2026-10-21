@@ -59,66 +59,49 @@ if (isset($_SESSION['aluno_id'])) {
 
 <main>
     <div class="container">
-        <!-- SEÇÃO HERO DE BOAS-VINDAS -->
         <section class="hero" aria-labelledby="titulo-principal">
-            <span class="badge">Reino Encantado da Matemática</span>
+            <span class="badge">Projeto educacional</span>
+
 
             <?php if (isset($_SESSION['aluno_id'])): ?>
+
                 <p>
-                    Olá, <strong><?= htmlspecialchars($_SESSION['aluno_nome'], ENT_QUOTES, 'UTF-8') ?></strong>!
-                    Que bom ter você de volta a Numéria!
+                    Olá,
+                    <?= htmlspecialchars(
+                        $_SESSION['aluno_nome'],
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ) ?>!
                 </p>
+
+                <p>Que bom ter você de volta ao Numéria!</p>
+
             <?php else: ?>
+
                 <p>
                     Entre na sua conta ou cadastre-se pelo menu superior
-                    para iniciar sua aventura matemática!
+                    para começar sua aventura matemática!
                 </p>
+
             <?php endif; ?>
 
             <h2 id="titulo-principal">Bem-vindo ao Numéria</h2>
             <p>
-                Uma plataforma de aprendizagem matemática gamificada voltada para alunos do Ensino Fundamental II,
-                onde cada conta resolvida é um feitiço dominado e cada erro é um passo para a sabedoria.
+                Uma plataforma de aprendizagem de matemática voltada para alunos do Ensino Fundamental II,
+                com foco em jogos, progresso e acompanhamento de dificuldades.
             </p>
         </section>
 
-        <!-- APRESENTAÇÃO DO BICÓ: TUCANO MÁGICO E MASCOTE OFICIAL -->
-        <section class="card bico-apresentacao-card" aria-label="Apresentação do Mascote Bicó">
-            <div class="bico-apresentacao-grid">
-                <div class="bico-mascote-avatar" role="img" aria-label="Bicó, o Tucano Mágico"></div>
-                <div class="bico-mascote-bio">
-                    <span class="badge">Mascote Oficial de Numéria</span>
-                    <h3 class="bico-titulo">Conheça o Bicó! O Tucano Mágico 🦉✨</h3>
-                    <p>
-                        Saudações, aventureiro! Eu sou o <strong>Bicó</strong>, um tucano feiticeiro de bico dourado e chapéu estelar.
-                        Fui escolhido pelo Reino de Numéria para ser o seu guia oficial em todas as aventuras matemáticas!
-                    </p>
-                    <p>
-                        Aqui no Numéria, <strong>tudo bem errar</strong>! O aprendizado é uma receita que se aprimora a cada tentativa.
-                        Em <em>todos os jogos</em> — da Batalha na Floresta ao Laboratório de Poções —, eu estarei ao seu lado sussurrando
-                        <strong>dicas especiais</strong>, estratégias de cálculo mental e explicações passo a passo quando você precisar!
-                    </p>
-                    <div class="bico-dicas-pilulas">
-                        <span class="bico-pilula">💡 Dicas em tempo real</span>
-                        <span class="bico-pilula">🧪 Mestre das Poções</span>
-                        <span class="bico-pilula">🏹 Guia na Floresta</span>
-                        <span class="bico-pilula">🛡️ Aliado contra o Guardião</span>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- CATÁLOGO DE JOGOS DISPONÍVEIS -->
         <section id="jogos" aria-labelledby="jogos-titulo" style="margin-top: 32px;">
             <h2 id="jogos-titulo">Jogos disponíveis</h2>
 
             <div class="grid">
                 <article class="card" aria-label="Batalha na Floresta">
                     <h3>Batalha na Floresta</h3>
-                    <p>Desafios rápidos de adição e subtração! Escolha entre o Desafio Relâmpago, o épico Contra o Guardião ou o Duelo em Dupla Local.</p>
+                    <p>Desafios de adição e subtração em modo individual ou dupla.</p>
 
                     <?php if (isset($_SESSION['aluno_id'])): ?>
-                        <a href="?pagina=batalha">Jogar Batalha</a>
+                        <a href="?pagina=batalha">Jogar</a>
                     <?php else: ?>
                         <a href="?pagina=login">Entrar para jogar</a>
                     <?php endif; ?>
@@ -126,10 +109,10 @@ if (isset($_SESSION['aluno_id'])) {
 
                 <article class="card" aria-label="Poções Mágicas">
                     <h3>Poções Mágicas</h3>
-                    <p>Entre no laboratório arcano para preparar receitas mágicas com frações, identificando partes e comparando poções poderosas com o Bicó.</p>
+                    <p>Aprendizado de frações com desafios de identificação e comparação.</p>
 
                     <?php if (isset($_SESSION['aluno_id'])): ?>
-                        <a href="?pagina=pocoes">Jogar Poções</a>
+                        <a href="?pagina=pocoes">Jogar</a>
                     <?php else: ?>
                         <a href="?pagina=login">Entrar para jogar</a>
                     <?php endif; ?>
@@ -137,31 +120,37 @@ if (isset($_SESSION['aluno_id'])) {
             </div>
         </section>
 
-        <!-- ACOMPANHAMENTO DO ALUNO -->
+
         <?php if ($resumoAluno !== null): ?>
-            <section id="acompanhamento" aria-labelledby="acompanhamento-titulo" style="margin-top: 32px;">
+            <section id="acompanhamento"
+                aria-labelledby="acompanhamento-titulo"
+                style="margin-top: 32px;">
+
                 <h2 id="acompanhamento-titulo">Meu acompanhamento</h2>
-                <p>Acompanhe sua evolução e conquistas no reino de Numéria!</p>
+
+                <p>Acompanhe seu progresso na aventura matemática!</p>
 
                 <div class="grid">
                     <article class="card">
                         <h3>XP acumulado</h3>
-                        <p class="destaque-numero">⭐ <?= number_format($resumoAluno['xp'], 0, ',', '.') ?> XP</p>
+                        <p>
+                            <?= number_format($resumoAluno['xp'], 0, ',', '.') ?> XP
+                        </p>
                     </article>
 
                     <article class="card">
                         <h3>Partidas finalizadas</h3>
-                        <p class="destaque-numero">🎮 <?= $resumoAluno['partidas'] ?></p>
+                        <p><?= $resumoAluno['partidas'] ?></p>
                     </article>
 
                     <article class="card">
                         <h3>Acertos</h3>
-                        <p class="destaque-numero" style="color: var(--cor-acerto) !important;">✅ <?= $resumoAluno['acertos'] ?></p>
+                        <p><?= $resumoAluno['acertos'] ?></p>
                     </article>
 
                     <article class="card">
-                        <h3>Erros (Tentativas)</h3>
-                        <p class="destaque-numero" style="color: var(--roxo) !important;">📚 <?= $resumoAluno['erros'] ?></p>
+                        <h3>Erros</h3>
+                        <p><?= $resumoAluno['erros'] ?></p>
                     </article>
                 </div>
             </section>
@@ -169,13 +158,12 @@ if (isset($_SESSION['aluno_id'])) {
 
         <?php if (isset($_SESSION['aluno_id'])): ?>
             <p style="margin-top: 20px;">
-                <a href="?pagina=historico" class="btn">
-                    📊 Ver meu histórico detalhado de partidas
+                <a href="?pagina=historico">
+                    Ver meu histórico de partidas
                 </a>
             </p>
         <?php endif; ?>
 
-        <!-- SOBRE A PLATAFORMA -->
         <section id="sobre" aria-labelledby="sobre-titulo" style="margin-top: 32px;">
             <h2 id="sobre-titulo">Objetivo da plataforma</h2>
             <p>
@@ -187,7 +175,7 @@ if (isset($_SESSION['aluno_id'])) {
             <p>
                 A plataforma busca tornar o aprendizado mais envolvente,
                 registrar o progresso dos estudantes e ajudar a identificar
-                conteúdos que precisam de mais atenção com o apoio do mascote Bicó.
+                conteúdos que precisam de mais atenção.
             </p>
 
             <p>

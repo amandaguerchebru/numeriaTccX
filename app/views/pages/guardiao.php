@@ -1,7 +1,6 @@
 <?php
 
 require_once __DIR__ . '/../../config/conexao.php';
-require_once __DIR__ . '/../../helpers/bicoHelper.php';
 
 if (empty($_SESSION['aluno_id'])) {
     header('Location: ?pagina=login');
@@ -10,10 +9,7 @@ if (empty($_SESSION['aluno_id'])) {
 
 $idAluno = (int) $_SESSION['aluno_id'];
 $mensagem = $_SESSION['guardiao_mensagem'] ?? '';
-$mensagemTipo = $_SESSION['guardiao_mensagem_tipo'] ?? 'acerto';
-$explicacao = $_SESSION['guardiao_explicacao'] ?? '';
-unset($_SESSION['guardiao_mensagem'], $_SESSION['guardiao_mensagem_tipo'], $_SESSION['guardiao_explicacao']);
-
+unset($_SESSION['guardiao_mensagem']);
 $resultado = null;
 $partidaAtiva = false;
 $partidaSemEstado = false;
@@ -41,15 +37,17 @@ if (isset($_GET['novo'])) {
         $_SESSION['guardiao_xp'],
         $_SESSION['guardiao_acertos'],
         $_SESSION['guardiao_erros'],
-        $_SESSION['guardiao_dificuldade'],
-        $_SESSION['guardiao_feedback']
+        $_SESSION['guardiao_dificuldade']
     );
     header('Location: ?pagina=guardiao');
     exit;
 }
 
 $consultaModo = $conexao->prepare(
-    'SELECT id_modo_jogo FROM modo_jogo WHERE nome = :nome LIMIT 1'
+    'SELECT id_modo_jogo
+     FROM modo_jogo
+     WHERE nome = :nome
+     LIMIT 1'
 );
 $consultaModo->execute(['nome' => 'Contra o Guardião']);
 $idModo = $consultaModo->fetchColumn();
@@ -174,7 +172,10 @@ $importarEstadoDaSessao = static function (
 
     try {
         $consultaAluno = $conexao->prepare(
-            'SELECT id_aluno FROM aluno WHERE id_aluno = :aluno FOR UPDATE'
+            'SELECT id_aluno
+             FROM aluno
+             WHERE id_aluno = :aluno
+             FOR UPDATE'
         );
         $consultaAluno->execute(['aluno' => $idAluno]);
 
@@ -202,37 +203,113 @@ $importarEstadoDaSessao = static function (
             return $estadoExistente;
         }
 
-        $consultaInsere = $conexao->prepare(
+        $consultaStatus = $conexao->prepare(
+            "SELECT status
+             FROM partida
+             WHERE id_partida = :partida
+               AND EXISTS (
+                   SELECT 1
+                   FROM partida_participante
+                   WHERE partida_participante.id_partida = partida.id_partida
+                     AND partida_participante.id_participante = :participante
+                     AND partida_participante.id_aluno = :aluno
+               )"
+        );
+        $consultaStatus->execute([
+            'partida' => $idPartida,
+            'participante' => $idParticipante,
+            'aluno' => $idAluno
+        ]);
+
+        if ($consultaStatus->fetchColumn() !== 'em_andamento') {
+            $conexao->commit();
+            return null;
+        }
+
+        $consultaResumo = $conexao->prepare(
+            'SELECT xp_total, acertos, erros
+             FROM partida_participante
+             WHERE id_participante = :participante
+               AND id_partida = :partida
+               AND id_aluno = :aluno'
+        );
+        $consultaResumo->execute([
+            'participante' => $idParticipante,
+            'partida' => $idPartida,
+            'aluno' => $idAluno
+        ]);
+        $resumo = $consultaResumo->fetch(PDO::FETCH_ASSOC);
+
+        $consultaContagemRespostas = $conexao->prepare(
+            'SELECT COUNT(*) AS total,
+                    COALESCE(SUM(acertou), 0) AS acertos,
+                    COALESCE(SUM(1 - acertou), 0) AS erros,
+                    COALESCE(SUM(xp_ganho), 0) AS xp
+             FROM resposta
+             WHERE id_participante = :participante'
+        );
+        $consultaContagemRespostas->execute([
+            'participante' => $idParticipante
+        ]);
+        $contagemRespostas = $consultaContagemRespostas->fetch(PDO::FETCH_ASSOC);
+
+        $consultaDificuldade = $conexao->prepare(
+            'SELECT id_dificuldade
+             FROM dificuldade
+             WHERE id_dificuldade = :dificuldade'
+        );
+        $consultaDificuldade->execute([
+            'dificuldade' => $idDificuldadeSessao
+        ]);
+
+        $consultaQuestoesDeOutraDificuldade = $conexao->prepare(
+            'SELECT COUNT(*)
+             FROM resposta r
+             WHERE r.id_participante = :participante
+               AND r.id_questao IN (
+                   SELECT id_questao
+                   FROM questao
+                   WHERE id_dificuldade <> :dificuldade
+                      OR id_jogo <> 1
+               )'
+        );
+        $consultaQuestoesDeOutraDificuldade->execute([
+            'participante' => $idParticipante,
+            'dificuldade' => $idDificuldadeSessao
+        ]);
+
+        if (
+            !$resumo
+            || $consultaDificuldade->fetchColumn() === false
+            || (int) $contagemRespostas['total'] !== $questoesSessao
+            || (int) $contagemRespostas['acertos'] !== $acertosSessao
+            || (int) $contagemRespostas['erros'] !== $errosSessao
+            || (int) $contagemRespostas['xp'] !== $xpSessao
+            || (int) $resumo['xp_total'] !== $xpSessao
+            || (int) $resumo['acertos'] !== $acertosSessao
+            || (int) $resumo['erros'] !== $errosSessao
+            || (int) $consultaQuestoesDeOutraDificuldade->fetchColumn() > 0
+        ) {
+            $conexao->commit();
+            return null;
+        }
+
+        $consultaImportaEstado = $conexao->prepare(
             'INSERT INTO guardiao_estado
-                (id_participante, id_partida, id_dificuldade, id_questao_atual,
-                 vidas_jogador, vidas_guardiao, questoes_respondidas)
+                (id_participante, id_partida, id_dificuldade,
+                 id_questao_atual, vidas_jogador, vidas_guardiao,
+                 questoes_respondidas)
              VALUES
                 (:participante, :partida, :dificuldade, NULL,
                  :vidas_jogador, :vidas_guardiao, :questoes)'
         );
-        $consultaInsere->execute([
+        $consultaImportaEstado->execute([
             'participante' => $idParticipante,
             'partida' => $idPartida,
             'dificuldade' => $idDificuldadeSessao,
             'vidas_jogador' => $vidasJogadorSessao,
             'vidas_guardiao' => $vidasGuardiaoSessao,
             'questoes' => $questoesSessao
-        ]);
-
-        $consultaAtualizaParticipante = $conexao->prepare(
-            'UPDATE partida_participante
-             SET xp_total = :xp,
-                 acertos = :acertos,
-                 erros = :erros
-             WHERE id_participante = :participante
-               AND id_partida = :partida'
-        );
-        $consultaAtualizaParticipante->execute([
-            'xp' => $xpSessao,
-            'acertos' => $acertosSessao,
-            'erros' => $errosSessao,
-            'participante' => $idParticipante,
-            'partida' => $idPartida
         ]);
 
         $conexao->commit();
@@ -250,83 +327,193 @@ $importarEstadoDaSessao = static function (
         if ($conexao->inTransaction()) {
             $conexao->rollBack();
         }
-        return null;
+        throw $e;
     }
 };
 
-$infoPartidaAtiva = $buscarPartidaAtiva($conexao, $idAluno, (int) $idModo);
-$partidaAtiva = false;
-
-if ($infoPartidaAtiva['estado'] !== null) {
-    $partidaAtiva = true;
-    $idPartida = (int) $infoPartidaAtiva['partida']['id_partida'];
-    $idParticipante = (int) $infoPartidaAtiva['partida']['id_participante'];
-    $estado = $infoPartidaAtiva['estado'];
-} elseif ($infoPartidaAtiva['sem_estado']) {
-    $estadoRecuperado = $importarEstadoDaSessao($conexao, $idAluno, $infoPartidaAtiva['partida']);
-    if ($estadoRecuperado !== null) {
-        $partidaAtiva = true;
-        $idPartida = (int) $infoPartidaAtiva['partida']['id_partida'];
-        $idParticipante = (int) $infoPartidaAtiva['partida']['id_participante'];
-        $estado = $estadoRecuperado;
-    } else {
-        $partidaSemEstado = true;
-        $partidaLegadaId = (int) $infoPartidaAtiva['partida']['id_partida'];
-    }
-}
-
-// INICIAR NOVA BATALHA
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['iniciar']) && !$partidaAtiva && !$partidaSemEstado) {
-    $idDificuldade = filter_input(INPUT_POST, 'id_dificuldade', FILTER_VALIDATE_INT);
-
-    $consultaDificuldade = $conexao->prepare(
-        'SELECT id_dificuldade, nome, xp_por_acerto FROM dificuldade WHERE id_dificuldade = :id'
+if ($idModo !== false) {
+    $partidaEncontrada = $buscarPartidaAtiva(
+        $conexao,
+        $idAluno,
+        (int) $idModo
     );
-    $consultaDificuldade->execute(['id' => $idDificuldade]);
-    $dificuldade = $consultaDificuldade->fetch(PDO::FETCH_ASSOC);
-
-    if (!$dificuldade) {
-        $mensagem = 'Selecione uma dificuldade válida.';
-        $mensagemTipo = 'erro';
-    } else {
-        $consultaPartida = $conexao->prepare(
-            "INSERT INTO partida (id_jogo, id_modo_jogo, tempo_segundos, status)
-             VALUES (1, :modo, 0, 'em_andamento')"
+    if ($partidaEncontrada['sem_estado']) {
+        $estadoImportado = $importarEstadoDaSessao(
+            $conexao,
+            $idAluno,
+            $partidaEncontrada['partida']
         );
-        $consultaPartida->execute(['modo' => (int) $idModo]);
-        $idPartida = (int) $conexao->lastInsertId();
+        if ($estadoImportado) {
+            $partidaEncontrada['estado'] = $estadoImportado;
+            $partidaEncontrada['sem_estado'] = false;
+        }
+    }
+    $partidaSemEstado = $partidaEncontrada['sem_estado'];
+    if ($partidaSemEstado) {
+        $partidaLegadaId = (int) $partidaEncontrada['partida']['id_partida'];
+    }
 
-        $consultaParticipante = $conexao->prepare(
-            'INSERT INTO partida_participante (id_partida, id_aluno, apelido, xp_total, acertos, erros)
-             VALUES (:partida, :aluno, :apelido, 0, 0, 0)'
-        );
-        $consultaParticipante->execute([
-            'partida' => $idPartida,
-            'aluno' => $idAluno,
-            'apelido' => $_SESSION['aluno_nome'] ?? 'Caçador'
-        ]);
-        $idParticipante = (int) $conexao->lastInsertId();
-
-        $consultaEstado = $conexao->prepare(
-            'INSERT INTO guardiao_estado
-                (id_participante, id_partida, id_dificuldade, id_questao_atual,
-                 vidas_jogador, vidas_guardiao, questoes_respondidas)
-             VALUES
-                (:participante, :partida, :dificuldade, NULL, 3, 3, 0)'
-        );
-        $consultaEstado->execute([
-            'participante' => $idParticipante,
-            'partida' => $idPartida,
-            'dificuldade' => (int) $dificuldade['id_dificuldade']
-        ]);
-
-        header('Location: ?pagina=guardiao');
-        exit;
+    if ($partidaEncontrada['estado']) {
+        $idPartida = (int) $partidaEncontrada['partida']['id_partida'];
+        $idParticipante = (int) $partidaEncontrada['partida']['id_participante'];
+        $estado = $partidaEncontrada['estado'];
+        $partidaAtiva = true;
     }
 }
 
-// PROCESSAR RESPOSTA NA BATALHA
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST'
+    && isset($_POST['iniciar'])
+    && !$partidaAtiva
+    && !$partidaSemEstado
+) {
+    $idDificuldade = filter_input(
+        INPUT_POST,
+        'id_dificuldade',
+        FILTER_VALIDATE_INT
+    );
+
+    if ($idDificuldade === false || $idDificuldade === null) {
+        $mensagem = 'Selecione uma dificuldade válida.';
+    } else {
+        $consultaDificuldade = $conexao->prepare(
+            'SELECT id_dificuldade
+             FROM dificuldade
+             WHERE id_dificuldade = :id'
+        );
+        $consultaDificuldade->execute(['id' => $idDificuldade]);
+
+        if ($consultaDificuldade->fetchColumn() === false) {
+            $mensagem = 'Selecione uma dificuldade válida.';
+        } elseif ($idModo === false) {
+            $mensagem = 'O modo Contra o Guardião não foi cadastrado no banco.';
+        } else {
+            $consultaQuantidadeQuestoes = $conexao->prepare(
+                'SELECT COUNT(*)
+                 FROM questao q
+                 WHERE q.id_jogo = 1
+                   AND q.id_dificuldade = :dificuldade
+                   AND q.ativo = 1
+                   AND EXISTS (
+                       SELECT 1
+                       FROM alternativa a
+                       WHERE a.id_questao = q.id_questao
+                   )'
+            );
+            $consultaQuantidadeQuestoes->execute([
+                'dificuldade' => $idDificuldade
+            ]);
+
+            if ((int) $consultaQuantidadeQuestoes->fetchColumn() < 10) {
+                $mensagem = 'Esta dificuldade precisa ter pelo menos 10 questões com alternativas.';
+            } else {
+                $conexao->beginTransaction();
+
+                try {
+                    $consultaAluno = $conexao->prepare(
+                        'SELECT id_aluno
+                         FROM aluno
+                         WHERE id_aluno = :aluno
+                         FOR UPDATE'
+                    );
+                    $consultaAluno->execute(['aluno' => $idAluno]);
+
+                    if ($consultaAluno->fetchColumn() === false) {
+                        throw new RuntimeException('A conta do aluno não está disponível.');
+                    }
+
+                    $partidaEncontrada = $buscarPartidaAtiva(
+                        $conexao,
+                        $idAluno,
+                        (int) $idModo
+                    );
+
+                    if ($partidaEncontrada['partida']) {
+                        $conexao->commit();
+                        $mensagem = $partidaEncontrada['sem_estado']
+                            ? 'Há uma partida antiga em andamento sem estado recuperável. Ela não foi substituída.'
+                            : 'Sua partida em andamento foi retomada.';
+                    } else {
+                        $consultaCriarPartida = $conexao->prepare(
+                            "INSERT INTO partida
+                                (id_jogo, id_modo_jogo, tempo_segundos, status)
+                             VALUES
+                                (1, :modo, 0, 'em_andamento')"
+                        );
+                        $consultaCriarPartida->execute([
+                            'modo' => (int) $idModo
+                        ]);
+                        $idPartida = (int) $conexao->lastInsertId();
+
+                        $consultaCriarParticipante = $conexao->prepare(
+                            'INSERT INTO partida_participante
+                                (id_partida, id_aluno, xp_total, acertos, erros)
+                             VALUES
+                                (:partida, :aluno, 0, 0, 0)'
+                        );
+                        $consultaCriarParticipante->execute([
+                            'partida' => $idPartida,
+                            'aluno' => $idAluno
+                        ]);
+                        $idParticipante = (int) $conexao->lastInsertId();
+
+                        $consultaCriarEstado = $conexao->prepare(
+                            'INSERT INTO guardiao_estado
+                                (id_participante, id_partida, id_dificuldade,
+                                 id_questao_atual, vidas_jogador, vidas_guardiao,
+                                 questoes_respondidas)
+                             VALUES
+                                (:participante, :partida, :dificuldade,
+                                 NULL, 3, 3, 0)'
+                        );
+                        $consultaCriarEstado->execute([
+                            'participante' => $idParticipante,
+                            'partida' => $idPartida,
+                            'dificuldade' => $idDificuldade
+                        ]);
+
+                        $conexao->commit();
+                        header('Location: ?pagina=guardiao');
+                        exit;
+                    }
+                } catch (Throwable $e) {
+                    if ($conexao->inTransaction()) {
+                        $conexao->rollBack();
+                    }
+                    throw $e;
+                }
+
+                $partidaEncontrada = $buscarPartidaAtiva(
+                    $conexao,
+                    $idAluno,
+                    (int) $idModo
+                );
+                $partidaSemEstado = $partidaEncontrada['sem_estado'];
+                if ($partidaSemEstado) {
+                    $partidaLegadaId = (int) $partidaEncontrada['partida']['id_partida'];
+                }
+
+                if ($partidaEncontrada['estado']) {
+                    $idPartida = (int) $partidaEncontrada['partida']['id_partida'];
+                    $idParticipante = (int) $partidaEncontrada['partida']['id_participante'];
+                    $estado = $partidaEncontrada['estado'];
+                    $partidaAtiva = true;
+                }
+            }
+        }
+    }
+}
+
+if ($partidaSemEstado) {
+    $mensagem = 'Há uma partida antiga em andamento sem estado recuperável. Ela não foi substituída.';
+}
+
 if ($partidaAtiva) {
+    $idDificuldade = (int) $estado['id_dificuldade'];
+    $vidasJogador = (int) $estado['vidas_jogador'];
+    $vidasGuardiao = (int) $estado['vidas_guardiao'];
+    $totalQuestoes = (int) $estado['questoes_respondidas'];
+
     $consultaResumo = $conexao->prepare(
         'SELECT xp_total, acertos, erros
          FROM partida_participante
@@ -334,12 +521,36 @@ if ($partidaAtiva) {
            AND id_partida = :partida
            AND id_aluno = :aluno'
     );
+    $consultaResumo->execute([
+        'participante' => $idParticipante,
+        'partida' => $idPartida,
+        'aluno' => $idAluno
+    ]);
+    $resumo = $consultaResumo->fetch(PDO::FETCH_ASSOC);
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['responder'])) {
-        $idQuestao = filter_input(INPUT_POST, 'id_questao', FILTER_VALIDATE_INT);
-        $idAlternativa = filter_input(INPUT_POST, 'id_alternativa', FILTER_VALIDATE_INT);
+    if (!$resumo) {
+        throw new RuntimeException('Não foi possível localizar os dados do participante da partida.');
+    }
+
+    $xpTotal = (int) $resumo['xp_total'];
+    $acertos = (int) $resumo['acertos'];
+    $erros = (int) $resumo['erros'];
+    $fimDeJogo = $vidasJogador <= 0 || $totalQuestoes >= 10;
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['responder']) && !$fimDeJogo) {
+        $idQuestaoEnviada = filter_input(
+            INPUT_POST,
+            'id_questao',
+            FILTER_VALIDATE_INT
+        );
+        $idAlternativa = filter_input(
+            INPUT_POST,
+            'id_alternativa',
+            FILTER_VALIDATE_INT
+        );
 
         $conexao->beginTransaction();
+
         try {
             $consultaEstadoBloqueado = $conexao->prepare(
                 'SELECT id_dificuldade, id_questao_atual, vidas_jogador,
@@ -353,104 +564,162 @@ if ($partidaAtiva) {
                 'participante' => $idParticipante,
                 'partida' => $idPartida
             ]);
-            $estadoAtual = $consultaEstadoBloqueado->fetch(PDO::FETCH_ASSOC);
+            $estadoBloqueado = $consultaEstadoBloqueado->fetch(PDO::FETCH_ASSOC);
 
-            if ($estadoAtual && (int) $estadoAtual['id_questao_atual'] === $idQuestao) {
-                $vidasJogadorAtual = (int) $estadoAtual['vidas_jogador'];
-                $vidasGuardiaoAtual = (int) $estadoAtual['vidas_guardiao'];
-                $questoesAtual = (int) $estadoAtual['questoes_respondidas'];
-                $idDificuldade = (int) $estadoAtual['id_dificuldade'];
+            $consultaStatusPartida = $conexao->prepare(
+                "SELECT status
+                 FROM partida
+                 WHERE id_partida = :partida
+                   AND EXISTS (
+                       SELECT 1
+                       FROM partida_participante
+                       WHERE partida_participante.id_partida = partida.id_partida
+                         AND partida_participante.id_participante = :participante
+                         AND partida_participante.id_aluno = :aluno
+                   )"
+            );
+            $consultaStatusPartida->execute([
+                'partida' => $idPartida,
+                'participante' => $idParticipante,
+                'aluno' => $idAluno
+            ]);
+            $statusPartida = $consultaStatusPartida->fetchColumn();
 
-                $consultaAlt = $conexao->prepare(
-                    'SELECT a.correta, q.enunciado, q.explicacao_curta
-                     FROM alternativa a
-                     JOIN questao q ON q.id_questao = a.id_questao
-                     WHERE a.id_alternativa = :alternativa
-                       AND a.id_questao = :questao
-                       AND q.id_jogo = 1
-                       AND q.id_dificuldade = :dificuldade
-                       AND q.ativo = 1
-                     LIMIT 1'
+            if (
+                !$estadoBloqueado
+                || $statusPartida !== 'em_andamento'
+                || $idQuestaoEnviada === false
+                || $idQuestaoEnviada === null
+                || $idAlternativa === false
+                || $idAlternativa === null
+                || (int) $idQuestaoEnviada !== (int) $estadoBloqueado['id_questao_atual']
+            ) {
+                $mensagem = 'Esta resposta já foi processada ou não corresponde à questão atual.';
+                $conexao->commit();
+            } else {
+                $idDificuldade = (int) $estadoBloqueado['id_dificuldade'];
+                $consultaRespostaValida = $conexao->prepare(
+                    'SELECT correta
+                     FROM alternativa
+                     WHERE id_alternativa = :alternativa
+                       AND id_questao = :questao
+                       AND EXISTS (
+                           SELECT 1
+                           FROM questao
+                           WHERE questao.id_questao = alternativa.id_questao
+                             AND questao.id_jogo = 1
+                             AND questao.id_dificuldade = :dificuldade
+                             AND questao.ativo = 1
+                       )'
                 );
-                $consultaAlt->execute([
+                $consultaRespostaValida->execute([
                     'alternativa' => $idAlternativa,
-                    'questao' => $idQuestao,
+                    'questao' => $idQuestaoEnviada,
                     'dificuldade' => $idDificuldade
                 ]);
-                $dadosResp = $consultaAlt->fetch(PDO::FETCH_ASSOC);
+                $correta = $consultaRespostaValida->fetchColumn();
 
-                if ($dadosResp) {
-                    $acertouResposta = ((int) $dadosResp['correta'] === 1);
+                if ($correta === false) {
+                    $mensagem = 'Questão ou alternativa inválida.';
+                    $conexao->commit();
+                } else {
+                    $acertouResposta = (int) $correta === 1;
                     $xpGanho = 0;
 
                     if ($acertouResposta) {
                         $consultaXP = $conexao->prepare(
-                            'SELECT xp_por_acerto FROM dificuldade WHERE id_dificuldade = :dificuldade'
+                            'SELECT xp_por_acerto
+                             FROM dificuldade
+                             WHERE id_dificuldade = :dificuldade'
                         );
                         $consultaXP->execute(['dificuldade' => $idDificuldade]);
-                        $xpGanho = (int) $consultaXP->fetchColumn();
+                        $xpConfigurado = $consultaXP->fetchColumn();
+
+                        if ($xpConfigurado === false) {
+                            throw new RuntimeException('O XP desta dificuldade não está configurado.');
+                        }
+
+                        $xpGanho = (int) $xpConfigurado;
                     }
 
-                    $novasVidasJogador = $acertouResposta ? $vidasJogadorAtual : max(0, $vidasJogadorAtual - 1);
-                    $novasVidasGuardiao = $acertouResposta ? max(0, $vidasGuardiaoAtual - 1) : $vidasGuardiaoAtual;
-                    $novoTotalQuestoes = $questoesAtual + 1;
-                    $fimResposta = ($novasVidasJogador <= 0 || $novoTotalQuestoes >= 10);
-
-                    // Registra resposta
-                    $consultaInsereResp = $conexao->prepare(
-                        'INSERT INTO resposta (id_participante, id_questao, id_alternativa, acertou, xp_ganho)
-                         VALUES (:participante, :questao, :alternativa, :acertou, :xp)'
+                    $novasVidasJogador = max(
+                        0,
+                        (int) $estadoBloqueado['vidas_jogador']
+                            - ($acertouResposta ? 0 : 1)
                     );
-                    $consultaInsereResp->execute([
+                    $novasVidasGuardiao = max(
+                        0,
+                        (int) $estadoBloqueado['vidas_guardiao']
+                            - ($acertouResposta ? 1 : 0)
+                    );
+                    $novoTotalQuestoes = (int) $estadoBloqueado['questoes_respondidas'] + 1;
+                    $novoAcerto = $acertouResposta ? 1 : 0;
+                    $novoErro = $acertouResposta ? 0 : 1;
+
+                    $consultaRegistro = $conexao->prepare(
+                        'INSERT INTO resposta
+                            (id_participante, id_questao, id_alternativa, acertou, xp_ganho)
+                         VALUES
+                            (:participante, :questao, :alternativa, :acertou, :xp)'
+                    );
+                    $consultaRegistro->execute([
                         'participante' => $idParticipante,
-                        'questao' => $idQuestao,
+                        'questao' => $idQuestaoEnviada,
                         'alternativa' => $idAlternativa,
-                        'acertou' => $acertouResposta ? 1 : 0,
+                        'acertou' => $novoAcerto,
                         'xp' => $xpGanho
                     ]);
 
-                    // Atualiza participante
-                    $consultaAtualizaPart = $conexao->prepare(
+                    $consultaAtualizaResumo = $conexao->prepare(
                         'UPDATE partida_participante
                          SET xp_total = xp_total + :xp,
                              acertos = acertos + :acertos,
                              erros = erros + :erros
-                         WHERE id_participante = :participante'
+                         WHERE id_participante = :participante
+                           AND id_partida = :partida
+                           AND id_aluno = :aluno'
                     );
-                    $consultaAtualizaPart->execute([
+                    $consultaAtualizaResumo->execute([
                         'xp' => $xpGanho,
-                        'acertos' => $acertouResposta ? 1 : 0,
-                        'erros' => $acertouResposta ? 0 : 1,
-                        'participante' => $idParticipante
+                        'acertos' => $novoAcerto,
+                        'erros' => $novoErro,
+                        'participante' => $idParticipante,
+                        'partida' => $idPartida,
+                        'aluno' => $idAluno
                     ]);
 
-                    // Sorteia próxima questão
+                    $fimResposta = $novasVidasJogador <= 0 || $novoTotalQuestoes >= 10;
                     $idProximaQuestao = null;
+
                     if (!$fimResposta) {
-                        $consultaProxima = $conexao->prepare(
+                        $consultaProximaQuestao = $conexao->prepare(
                             'SELECT q.id_questao
                              FROM questao q
                              WHERE q.id_jogo = 1
                                AND q.id_dificuldade = :dificuldade
                                AND q.ativo = 1
                                AND NOT EXISTS (
-                                   SELECT 1 FROM resposta r
+                                   SELECT 1
+                                   FROM resposta r
                                    WHERE r.id_participante = :participante
                                      AND r.id_questao = q.id_questao
                                )
                                AND EXISTS (
-                                   SELECT 1 FROM alternativa a WHERE a.id_questao = q.id_questao
+                                   SELECT 1
+                                   FROM alternativa a
+                                   WHERE a.id_questao = q.id_questao
                                )
                              ORDER BY RAND()
                              LIMIT 1'
                         );
-                        $consultaProxima->execute([
+                        $consultaProximaQuestao->execute([
                             'dificuldade' => $idDificuldade,
                             'participante' => $idParticipante
                         ]);
-                        $proxima = $consultaProxima->fetchColumn();
-                        if ($proxima !== false) {
-                            $idProximaQuestao = (int) $proxima;
+                        $proximaQuestao = $consultaProximaQuestao->fetchColumn();
+
+                        if ($proximaQuestao !== false) {
+                            $idProximaQuestao = (int) $proximaQuestao;
                         }
                     }
 
@@ -474,25 +743,19 @@ if ($partidaAtiva) {
 
                     if ($fimResposta) {
                         $consultaFinaliza = $conexao->prepare(
-                            "UPDATE partida SET status = 'finalizada', data_fim = NOW()
-                             WHERE id_partida = :partida AND status = 'em_andamento'"
+                            "UPDATE partida
+                             SET status = 'finalizada',
+                                 data_fim = NOW()
+                             WHERE id_partida = :partida
+                               AND status = 'em_andamento'"
                         );
                         $consultaFinaliza->execute(['partida' => $idPartida]);
                     }
 
                     $conexao->commit();
-
-                    $dicaBico = gerarDicaBico($dadosResp['enunciado'], $dadosResp['explicacao_curta'] ?? '');
-
-                    if ($acertouResposta) {
-                        $_SESSION['guardiao_mensagem'] = "✨ Golpe certeiro! O Guardião foi atingido e você ganhou {$xpGanho} XP!";
-                        $_SESSION['guardiao_mensagem_tipo'] = 'acerto';
-                        $_SESSION['guardiao_explicacao'] = $dadosResp['explicacao_curta'] ?? '';
-                    } else {
-                        $_SESSION['guardiao_mensagem'] = "🛡️ O Guardião bloqueou seu ataque e você perdeu 1 coração! Mas o Bicó te ensina o cálculo:";
-                        $_SESSION['guardiao_mensagem_tipo'] = 'erro';
-                        $_SESSION['guardiao_explicacao'] = $dicaBico;
-                    }
+                    $mensagem = $acertouResposta
+                        ? 'Resposta correta! O Guardião foi atingido e você ganhou ' . $xpGanho . ' XP!'
+                        : 'Resposta incorreta! Você perdeu uma vida.';
                 }
             }
         } catch (Throwable $e) {
@@ -502,6 +765,7 @@ if ($partidaAtiva) {
             throw $e;
         }
 
+        $_SESSION['guardiao_mensagem'] = $mensagem;
         header('Location: ?pagina=guardiao');
         exit;
     }
@@ -522,44 +786,67 @@ if ($partidaAtiva) {
     $vidasJogador = (int) $estado['vidas_jogador'];
     $vidasGuardiao = (int) $estado['vidas_guardiao'];
     $totalQuestoes = (int) $estado['questoes_respondidas'];
-    $fimDeJogo = ($vidasJogador <= 0 || $totalQuestoes >= 10);
+    $fimDeJogo = $vidasJogador <= 0 || $totalQuestoes >= 10;
 
-    // Se não há questão atual sorteada e o jogo continua
     if (!$fimDeJogo && $estado['id_questao_atual'] === null) {
         $conexao->beginTransaction();
-        try {
-            $consultaQAtual = $conexao->prepare(
-                'SELECT q.id_questao
-                 FROM questao q
-                 WHERE q.id_jogo = 1
-                   AND q.id_dificuldade = :dificuldade
-                   AND q.ativo = 1
-                   AND NOT EXISTS (
-                       SELECT 1 FROM resposta r
-                       WHERE r.id_participante = :participante AND r.id_questao = q.id_questao
-                   )
-                   AND EXISTS (
-                       SELECT 1 FROM alternativa a WHERE a.id_questao = q.id_questao
-                   )
-                 ORDER BY RAND()
-                 LIMIT 1'
-            );
-            $consultaQAtual->execute([
-                'dificuldade' => (int) $estado['id_dificuldade'],
-                'participante' => $idParticipante
-            ]);
-            $idQNova = $consultaQAtual->fetchColumn();
 
-            if ($idQNova !== false) {
-                $consultaSalvaQ = $conexao->prepare(
-                    'UPDATE guardiao_estado SET id_questao_atual = :questao WHERE id_participante = :participante AND id_partida = :partida'
+        try {
+            $consultaEstadoBloqueado = $conexao->prepare(
+                'SELECT id_dificuldade, id_questao_atual
+                 FROM guardiao_estado
+                 WHERE id_participante = :participante
+                   AND id_partida = :partida
+                 FOR UPDATE'
+            );
+            $consultaEstadoBloqueado->execute([
+                'participante' => $idParticipante,
+                'partida' => $idPartida
+            ]);
+            $estadoBloqueado = $consultaEstadoBloqueado->fetch(PDO::FETCH_ASSOC);
+
+            if ($estadoBloqueado['id_questao_atual'] === null) {
+                $consultaQuestaoAtual = $conexao->prepare(
+                    'SELECT q.id_questao
+                     FROM questao q
+                     WHERE q.id_jogo = 1
+                       AND q.id_dificuldade = :dificuldade
+                       AND q.ativo = 1
+                       AND NOT EXISTS (
+                           SELECT 1
+                           FROM resposta r
+                           WHERE r.id_participante = :participante
+                             AND r.id_questao = q.id_questao
+                       )
+                       AND EXISTS (
+                           SELECT 1
+                           FROM alternativa a
+                           WHERE a.id_questao = q.id_questao
+                       )
+                     ORDER BY RAND()
+                     LIMIT 1'
                 );
-                $consultaSalvaQ->execute([
-                    'questao' => (int) $idQNova,
-                    'participante' => $idParticipante,
-                    'partida' => $idPartida
+                $consultaQuestaoAtual->execute([
+                    'dificuldade' => (int) $estadoBloqueado['id_dificuldade'],
+                    'participante' => $idParticipante
                 ]);
+                $idQuestaoAtual = $consultaQuestaoAtual->fetchColumn();
+
+                if ($idQuestaoAtual !== false) {
+                    $consultaSalvaQuestao = $conexao->prepare(
+                        'UPDATE guardiao_estado
+                         SET id_questao_atual = :questao
+                         WHERE id_participante = :participante
+                           AND id_partida = :partida'
+                    );
+                    $consultaSalvaQuestao->execute([
+                        'questao' => (int) $idQuestaoAtual,
+                        'participante' => $idParticipante,
+                        'partida' => $idPartida
+                    ]);
+                }
             }
+
             $conexao->commit();
         } catch (Throwable $e) {
             if ($conexao->inTransaction()) {
@@ -577,22 +864,33 @@ if ($partidaAtiva) {
 
     if ($estado['id_questao_atual'] !== null && !$fimDeJogo) {
         $consultaEnunciado = $conexao->prepare(
-            'SELECT enunciado, explicacao_curta FROM questao WHERE id_questao = :questao AND id_jogo = 1 AND ativo = 1'
+            'SELECT enunciado
+             FROM questao
+             WHERE id_questao = :questao
+               AND id_jogo = 1
+               AND id_dificuldade = :dificuldade
+               AND ativo = 1'
         );
-        $consultaEnunciado->execute(['questao' => (int) $estado['id_questao_atual']]);
-        $dadosQ = $consultaEnunciado->fetch(PDO::FETCH_ASSOC);
+        $consultaEnunciado->execute([
+            'questao' => (int) $estado['id_questao_atual'],
+            'dificuldade' => (int) $estado['id_dificuldade']
+        ]);
+        $enunciado = $consultaEnunciado->fetchColumn();
 
-        if ($dadosQ) {
+        if ($enunciado !== false) {
             $questao = [
                 'id_questao' => (int) $estado['id_questao_atual'],
-                'enunciado' => $dadosQ['enunciado'],
-                'explicacao_curta' => $dadosQ['explicacao_curta'] ?? ''
+                'enunciado' => $enunciado
             ];
-
             $consultaAlternativas = $conexao->prepare(
-                'SELECT id_alternativa, texto FROM alternativa WHERE id_questao = :questao ORDER BY id_alternativa'
+                'SELECT id_alternativa, texto
+                 FROM alternativa
+                 WHERE id_questao = :questao
+                 ORDER BY id_alternativa'
             );
-            $consultaAlternativas->execute(['questao' => (int) $estado['id_questao_atual']]);
+            $consultaAlternativas->execute([
+                'questao' => (int) $estado['id_questao_atual']
+            ]);
             $alternativas = $consultaAlternativas->fetchAll(PDO::FETCH_ASSOC);
         }
     }
@@ -606,248 +904,146 @@ if ($partidaAtiva) {
     $xpTotal = (int) $resumo['xp_total'];
     $acertos = (int) $resumo['acertos'];
     $erros = (int) $resumo['erros'];
+    $fimDeJogo = $vidasJogador <= 0 || $totalQuestoes >= 10;
 
     if ($fimDeJogo) {
         if ($vidasJogador <= 0) {
-            $resultado = 'Fim da batalha! O Guardião foi forte, mas você lutou com coragem e aprendeu muito com o Bicó!';
+            $resultado = 'Fim da batalha! Você perdeu todas as vidas após '
+                . $totalQuestoes . ' desafios.';
         } elseif ($acertos > $erros) {
-            $resultado = '🏆 Vitória Gloriosa! Você dominou a matemática e superou o Guardião da Floresta!';
+            $resultado = '🏆 Vitória! Você superou os desafios do Guardião da Floresta!';
         } elseif ($erros > $acertos) {
-            $resultado = '🛡️ Fim da batalha! O Guardião resistiu desta vez, mas o reino agradece sua determinação!';
+            $resultado = '🛡️ Fim da batalha! O Guardião resistiu desta vez, mas você completou os desafios!';
         } else {
-            $resultado = '🤝 Empate Heróico! Você e o Guardião mostraram perfeito equilíbrio matemático!';
+            $resultado = '🤝 Empate heróico! Você e o Guardião mostraram grande equilíbrio matemático!';
         }
     }
 }
+
 ?>
 
 <main class="container">
     <section class="hero">
-        <span class="badge">Batalha na Floresta · Modo Guardião</span>
-        <h2>Contra o Guardião da Floresta</h2>
-        <p>Enfrente a entidade ancestral da floresta num duelo épico de matemática!</p>
+        <span class="badge">Batalha na Floresta</span>
+        <h2>Contra o Guardião</h2>
 
-        <!-- FEEDBACK DO BICÓ -->
         <?php if ($mensagem !== ''): ?>
-            <?= renderBicoFeedbackHtml($mensagem, $mensagemTipo, $explicacao) ?>
+            <p role="status">
+                <?= htmlspecialchars($mensagem, ENT_QUOTES, 'UTF-8') ?>
+            </p>
         <?php endif; ?>
 
         <?php if ($partidaSemEstado): ?>
+
             <p>
                 Há uma partida antiga em andamento sem estado recuperável.
                 Ela não foi substituída; conclua ou abandone essa partida antes de iniciar outra.
             </p>
-            <a href="?pagina=abandonar_guardiao&id_partida=<?= $partidaLegadaId ?>" class="btn btn-secondary">
-                Abandonar partida antiga
+            <a
+                href="?pagina=abandonar_guardiao&id_partida=<?= $partidaLegadaId ?>"
+                class="btn btn-secondary">
+                Abandonar esta partida antiga
             </a>
 
         <?php elseif (!$partidaAtiva): ?>
-            <article class="card">
-                <h3>Escolha o nível do Guardião</h3>
-                <p>O Guardião da Floresta testará sua precisão e velocidade em contas de adição e subtração.</p>
 
-                <?php
-                $consultaDificuldades = $conexao->query('SELECT id_dificuldade, nome, xp_por_acerto FROM dificuldade ORDER BY id_dificuldade');
-                $dificuldades = $consultaDificuldades->fetchAll(PDO::FETCH_ASSOC);
-                ?>
+            <p>Escolha a dificuldade para iniciar a batalha.</p>
 
-                <form method="POST">
-                    <div style="margin-bottom: 20px;">
-                        <label for="id_dificuldade">
-                            <strong>Dificuldade da Batalha:</strong><br>
-                            <select name="id_dificuldade" id="id_dificuldade" required>
-                                <option value="">Selecione o nível</option>
-                                <?php foreach ($dificuldades as $dificuldade): ?>
-                                    <option value="<?= (int) $dificuldade['id_dificuldade'] ?>">
-                                        <?= htmlspecialchars($dificuldade['nome'], ENT_QUOTES, 'UTF-8') ?> (<?= (int) $dificuldade['xp_por_acerto'] ?> XP por acerto)
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
-                    </div>
+            <?php
+            $consultaDificuldades = $conexao->query(
+                'SELECT id_dificuldade, nome
+                 FROM dificuldade
+                 ORDER BY id_dificuldade'
+            );
+            $dificuldades = $consultaDificuldades->fetchAll(PDO::FETCH_ASSOC);
+            ?>
 
-                    <button type="submit" name="iniciar" value="1" class="btn">
-                        ⚔️ Iniciar Batalha Épica
-                    </button>
-                </form>
-            </article>
+            <form method="POST">
+                <label for="id_dificuldade">Dificuldade</label>
+                <select name="id_dificuldade" id="id_dificuldade" required>
+                    <option value="">Selecione</option>
+                    <?php foreach ($dificuldades as $dificuldade): ?>
+                        <option value="<?= (int) $dificuldade['id_dificuldade'] ?>">
+                            <?= htmlspecialchars($dificuldade['nome'], ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
 
-            <p style="margin-top: 24px;">
-                <a href="?pagina=batalha">Voltar aos modos de Batalha</a>
-            </p>
+                <button type="submit" name="iniciar" value="1">
+                    Iniciar batalha
+                </button>
+            </form>
 
         <?php elseif ($fimDeJogo): ?>
 
-            <article class="card resultado-card">
-                <div class="resultado-vencedor-destaque">
-                    <?php if ($vidasJogador > 0 && $acertos >= $erros): ?>
-                        <span class="pixel-avatar-grande avatar-cacador" aria-hidden="true"></span>
-                    <?php else: ?>
-                        <span class="pixel-avatar-grande avatar-guardiao" aria-hidden="true"></span>
-                    <?php endif; ?>
-                    <h3><?= htmlspecialchars($resultado ?? 'Batalha encerrada', ENT_QUOTES, 'UTF-8') ?></h3>
-                </div>
+            <h3><?= htmlspecialchars($resultado ?? 'Batalha encerrada', ENT_QUOTES, 'UTF-8') ?></h3>
 
-                <div class="grid" style="margin-top: 20px;">
-                    <article class="card">
-                        <h4>Desafios Enfrentados</h4>
-                        <p class="destaque-numero"><?= $totalQuestoes ?> de 10</p>
-                    </article>
+            <p>Questões respondidas: <?= $totalQuestoes ?> de 10</p>
+            <p>Acertos: <?= $acertos ?></p>
+            <p>Erros: <?= $erros ?></p>
+            <p>XP conquistado: <?= $xpTotal ?></p>
 
-                    <article class="card">
-                        <h4>Golpes Certos (Acertos)</h4>
-                        <p class="destaque-numero" style="color: var(--cor-acerto) !important;">✅ <?= $acertos ?></p>
-                    </article>
+            <a href="?pagina=guardiao&novo=1" class="btn">
+                Jogar novamente
+            </a>
 
-                    <article class="card">
-                        <h4>Bloqueios (Erros)</h4>
-                        <p class="destaque-numero" style="color: var(--cor-erro) !important;">❌ <?= $erros ?></p>
-                    </article>
-
-                    <article class="card">
-                        <h4>XP Total Conquistado</h4>
-                        <p class="destaque-numero" style="color: var(--cor-ouro-escuro) !important;">⭐ <?= $xpTotal ?> XP</p>
-                    </article>
-                </div>
-
-                <div style="margin-top: 24px;">
-                    <a href="?pagina=guardiao&novo=1" class="btn">⚔️ Desafiar novamente</a>
-                    <a href="?pagina=batalha" class="btn btn-secondary">Voltar aos modos</a>
-                </div>
-            </article>
+            <a href="?pagina=batalha" class="btn">
+                Voltar aos modos
+            </a>
 
         <?php else: ?>
 
-            <!-- ARENA DE BATALHA COM INFORMAÇÕES DE VIDA E DESEMPENHO MUITO MAIORES E VISÍVEIS -->
-            <div class="arena-batalha-container card">
-                <div class="arena-duelo-grid">
-                    
-                    <!-- LADO DO JOGADOR (CAÇADOR) -->
-                    <div class="lutador-card lutador-jogador">
-                        <div class="lutador-avatar-wrap">
-                            <span class="pixel-avatar-luta avatar-cacador" aria-hidden="true"></span>
-                        </div>
-                        <div class="lutador-info">
-                            <span class="badge-lutador">HERÓI DO REINO</span>
-                            <h4 class="lutador-nome"><?= htmlspecialchars($_SESSION['aluno_nome'] ?? 'Caçador', ENT_QUOTES, 'UTF-8') ?></h4>
-                            
-                            <!-- CORAÇÕES DE VIDA GRANDES EM PIXEL ART -->
-                            <div class="vidas-container-grande" aria-label="Vidas do Jogador: <?= $vidasJogador ?> de 3">
-                                <?php for ($i = 1; $i <= 3; $i++): ?>
-                                    <span class="coracao-pixel-hud <?= ($i <= $vidasJogador) ? 'coracao-cheio' : 'coracao-vazio' ?>" aria-hidden="true"></span>
-                                <?php endfor; ?>
-                                <span class="texto-vidas-hud"><?= $vidasJogador ?>/3 VIDAS</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- CENTRO: VERSUS E RODADA -->
-                    <div class="arena-vs-centro">
-                        <div class="emblema-vs">VS</div>
-                        <div class="rodada-badge">RODADA <?= min(10, $totalQuestoes + 1) ?>/10</div>
-                    </div>
-
-                    <!-- LADO DO GUARDIÃO -->
-                    <div class="lutador-card lutador-guardiao">
-                        <div class="lutador-avatar-wrap">
-                            <span class="pixel-avatar-luta avatar-guardiao" aria-hidden="true"></span>
-                        </div>
-                        <div class="lutador-info">
-                            <span class="badge-lutador badge-roxo">ANCESTRAL</span>
-                            <h4 class="lutador-nome">Guardião da Floresta</h4>
-                            
-                            <!-- ESCUDOS MÍSTICOS GRANDES EM PIXEL ART -->
-                            <div class="vidas-container-grande" aria-label="Escudos do Guardião: <?= $vidasGuardiao ?> de 3">
-                                <?php for ($i = 1; $i <= 3; $i++): ?>
-                                    <span class="escudo-pixel-hud <?= ($i <= $vidasGuardiao) ? 'escudo-cheio' : 'escudo-vazio' ?>" aria-hidden="true"></span>
-                                <?php endfor; ?>
-                                <span class="texto-vidas-hud"><?= $vidasGuardiao ?>/3 ESCUDOS</span>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-
-                <!-- PAINEL DE DESEMPENHO AMPLIADO -->
-                <div class="arena-desempenho-painel">
-                    <div class="arena-stats-grid">
-                        <div class="stat-box">
-                            <span class="stat-rotulo">Desafio Atual</span>
-                            <strong class="stat-valor"><?= min(10, $totalQuestoes + 1) ?> de 10</strong>
-                        </div>
-                        <div class="stat-box">
-                            <span class="stat-rotulo">Acertos Certeiros</span>
-                            <strong class="stat-valor stat-acerto">✅ <?= $acertos ?></strong>
-                        </div>
-                        <div class="stat-box">
-                            <span class="stat-rotulo">Bloqueios / Erros</span>
-                            <strong class="stat-valor stat-erro">❌ <?= $erros ?></strong>
-                        </div>
-                        <div class="stat-box">
-                            <span class="stat-rotulo">XP Acumulado</span>
-                            <strong class="stat-valor stat-ouro">⭐ <?= $xpTotal ?> XP</strong>
-                        </div>
-                    </div>
-                    <div class="barra-batalha-wrap">
-                        <span class="barra-rotulo">Progresso da Batalha:</span>
-                        <progress value="<?= $totalQuestoes ?>" max="10" aria-label="Progresso da Batalha contra o Guardião"></progress>
-                    </div>
-                </div>
+            <div class="painel-status" style="margin-bottom: 20px;">
+                <p>
+                    Vidas do Jogador: <strong><?= str_repeat('❤️ ', max(0, $vidasJogador)) ?: '💔 Sem escudos' ?></strong> (<?= $vidasJogador ?>/3) |
+                    Vidas do Guardião: <strong><?= str_repeat('🟣 ', max(0, $vidasGuardiao)) ?: '💥 Atordoado' ?></strong> (<?= $vidasGuardiao ?>/3)
+                </p>
+                <p>
+                    Desafio: <strong><?= min(10, $totalQuestoes + 1) ?></strong> de 10 |
+                    Acertos: <strong><?= $acertos ?></strong> |
+                    XP: <strong><?= $xpTotal ?> XP</strong>
+                </p>
+                <progress value="<?= $totalQuestoes ?>" max="10" style="width: 100%;" aria-label="Progresso da batalha"></progress>
             </div>
 
-            <!-- CARD DA QUESTÃO ATIVA -->
             <?php if ($questao): ?>
-                <?php
-                $dicaGuardiao = gerarDicaBico($questao['enunciado'], $questao['explicacao_curta'] ?? '');
-                ?>
-                <article class="card" style="margin-top: 24px;">
-                    <span class="badge">Ataque Matemático</span>
-                    <h3 style="font-size: 1.45rem; margin: 14px 0;">
-                        <?= htmlspecialchars($questao['enunciado'], ENT_QUOTES, 'UTF-8') ?>
-                    </h3>
-
-                    <!-- DICA DO BICÓ NO GUARDIÃO -->
-                    <?= renderBicoDicaBotaoHtml($dicaGuardiao) ?>
+                <article class="card">
+                    <h3><?= htmlspecialchars($questao['enunciado'], ENT_QUOTES, 'UTF-8') ?></h3>
 
                     <?php if ($alternativas): ?>
-                        <form method="POST" style="margin-top: 18px;">
+                        <form method="POST">
                             <input type="hidden" name="id_questao" value="<?= (int) $questao['id_questao'] ?>">
 
-                            <fieldset>
-                                <legend class="sr-only">Escolha sua resposta de ataque</legend>
-                                <?php foreach ($alternativas as $alternativa): ?>
-                                    <label>
-                                        <input
-                                            type="radio"
-                                            name="id_alternativa"
-                                            value="<?= (int) $alternativa['id_alternativa'] ?>"
-                                            required>
-                                        <strong><?= htmlspecialchars($alternativa['texto'], ENT_QUOTES, 'UTF-8') ?></strong>
-                                    </label>
-                                    <br>
-                                <?php endforeach; ?>
-                            </fieldset>
+                            <?php foreach ($alternativas as $alternativa): ?>
+                                <label>
+                                    <input
+                                        type="radio"
+                                        name="id_alternativa"
+                                        value="<?= (int) $alternativa['id_alternativa'] ?>"
+                                        required>
+                                    <?= htmlspecialchars($alternativa['texto'], ENT_QUOTES, 'UTF-8') ?>
+                                </label>
+                                <br>
+                            <?php endforeach; ?>
 
-                            <div style="margin-top: 18px;">
-                                <button type="submit" name="responder" value="1" class="btn">
-                                    ⚔️ Desferir Golpe Matemático
-                                </button>
-                            </div>
+                            <button type="submit" name="responder" value="1">
+                                Responder
+                            </button>
                         </form>
                     <?php else: ?>
-                        <p>Esta questão não possui alternativas cadastradas.</p>
+                        <p>Esta questão não possui alternativas.</p>
                     <?php endif; ?>
                 </article>
             <?php else: ?>
                 <p>Não há uma questão disponível para continuar. Seu progresso foi preservado.</p>
             <?php endif; ?>
 
-            <p style="margin-top: 24px;">
-                <a href="?pagina=abandonar_guardiao&id_partida=<?= $idPartida ?>" class="btn btn-secondary" onclick="return confirm('Tem certeza que deseja abandonar esta batalha contra o Guardião?');">
-                    🏳️ Abandonar batalha e voltar aos modos
-                </a>
-            </p>
+        <?php endif; ?>
 
+        <?php if ($partidaAtiva && !$fimDeJogo): ?>
+            <p><a href="?pagina=abandonar_guardiao&id_partida=<?= $idPartida ?>" class="btn btn-secondary">Voltar aos modos (Abandonar batalha)</a></p>
+        <?php else: ?>
+            <p><a href="?pagina=batalha">Voltar à Batalha na Floresta</a></p>
         <?php endif; ?>
     </section>
 </main>

@@ -179,15 +179,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['iniciar_dupla'])) {
 $partidaAtiva = !empty($_SESSION['dupla_partida_id']);
 $fimDeJogo = false;
 $vencedorTexto = '';
-$vencedorAvatar = 'cacador';
+$vencedorAvatar = 'bico';
 
 if ($partidaAtiva) {
     $idP1 = (int) $_SESSION['dupla_p1_participante_id'];
     $idP2 = (int) $_SESSION['dupla_p2_participante_id'];
     $idPartida = (int) $_SESSION['dupla_partida_id'];
     $idDificuldade = (int) $_SESSION['dupla_dificuldade'];
-    $nomeP1 = $_SESSION['dupla_p1_nome'] ?? 'Caçador';
-    $nomeP2 = $_SESSION['dupla_p2_nome'] ?? 'Monstrinho';
+    $nomeP1 = $_SESSION['dupla_p1_nome'] ?? ($_SESSION['aluno_nome'] ?? 'Bicó');
+    $nomeP2 = $_SESSION['dupla_p2_nome'] ?? 'Oncinha';
     $turnoAtual = (int) ($_SESSION['dupla_turno'] ?? 1);
 
     $totalP1 = (int) $_SESSION['dupla_p1_questoes'];
@@ -203,7 +203,7 @@ if ($partidaAtiva) {
 
         $idParticipanteVez = ($turnoAtual === 1) ? $idP1 : $idP2;
         $nomeVez = ($turnoAtual === 1) ? $nomeP1 : $nomeP2;
-        $papelVez = ($turnoAtual === 1) ? 'Caçador' : 'Monstrinho';
+        $papelVez = ($turnoAtual === 1) ? 'Bicó' : 'Oncinha';
 
         $consultaValida = $conexao->prepare(
             'SELECT a.correta, q.enunciado, q.explicacao_curta
@@ -378,13 +378,13 @@ if ($partidaAtiva) {
         $acertos2 = (int) $_SESSION['dupla_p2_acertos'];
 
         if ($acertos1 > $acertos2) {
-            $vencedorTexto = "🏆 Vitória de {$nomeP1} (O Caçador)!";
-            $vencedorAvatar = 'cacador';
+            $vencedorTexto = "🏆 Vitória de {$nomeP1} (Bicó Guerreiro)!";
+            $vencedorAvatar = 'bico';
         } elseif ($acertos2 > $acertos1) {
-            $vencedorTexto = "🏆 Vitória de {$nomeP2} (O Monstrinho)!";
-            $vencedorAvatar = 'monstrinho';
+            $vencedorTexto = "🏆 Vitória de {$nomeP2} (A Oncinha)!";
+            $vencedorAvatar = 'oncinha';
         } else {
-            $vencedorTexto = "🤝 Empate Mágico! Ambos os aventureiros foram brilhantes!";
+            $vencedorTexto = "🤝 Empate Mágico! Bicó e Oncinha mostraram perfeita harmonia!";
             $vencedorAvatar = 'ambos';
         }
     }
@@ -394,8 +394,8 @@ if ($partidaAtiva) {
 <main class="container">
     <section class="hero">
         <span class="badge">Batalha na Floresta · Modo Dupla Local</span>
-        <h2>Duelo na Floresta (Caçador vs Monstrinho)</h2>
-        <p>Dois aventureiros no mesmo teclado com a estética mágica de Numéria!</p>
+        <h2>Duelo na Floresta (Bicó Guerreiro vs Oncinha)</h2>
+        <p>Bicó com armadura (jogador logado) e a Oncinha (sua duplinha) em desafios de matemática no mesmo computador!</p>
 
         <!-- FEEDBACK DO BICÓ -->
         <?php if ($mensagem !== ''): ?>
@@ -406,7 +406,7 @@ if ($partidaAtiva) {
 
             <article class="card">
                 <h3>Configurar Duelo em Dupla</h3>
-                <p>O <strong>Jogador 1</strong> é o Caçador e o <strong>Jogador 2</strong> é o Monstrinho da Floresta em pixel art.</p>
+                <p>O <strong>Jogador 1</strong> é representado pelo Bicó com Armadura (usuário logado) e o <strong>Jogador 2</strong> é a Oncinha, a duplinha que entra para jogar junto!</p>
 
                 <?php
                 $consultaDificuldades = $conexao->query(
@@ -418,9 +418,9 @@ if ($partidaAtiva) {
                 <form method="POST">
                     <div style="margin-bottom: 20px;">
                         <label>
-                            <strong>Jogador 1 — O Caçador da Floresta:</strong><br>
+                            <strong>Jogador 1 (Você) — Bicó com Armadura:</strong><br>
                             <div class="input-com-avatar">
-                                <span class="pixel-avatar-preview avatar-cacador" aria-hidden="true"></span>
+                                <span class="pixel-avatar-preview avatar-bico-armadura" aria-hidden="true"></span>
                                 <input type="text" value="<?= htmlspecialchars($_SESSION['aluno_nome'] ?? 'Jogador 1', ENT_QUOTES, 'UTF-8') ?>" disabled>
                             </div>
                         </label>
@@ -428,14 +428,14 @@ if ($partidaAtiva) {
 
                     <div style="margin-bottom: 20px;">
                         <label for="apelido_jogador2">
-                            <strong>Jogador 2 — O Monstrinho Mágico:</strong><br>
+                            <strong>Jogador 2 — Oncinha (Duplinha de Aventuras):</strong><br>
                             <div class="input-com-avatar">
-                                <span class="pixel-avatar-preview avatar-monstrinho" aria-hidden="true"></span>
+                                <span class="pixel-avatar-preview avatar-oncinha" aria-hidden="true"></span>
                                 <input
                                     type="text"
                                     name="apelido_jogador2"
                                     id="apelido_jogador2"
-                                    placeholder="Apelido do amigo (Monstrinho)"
+                                    placeholder="Apelido da duplinha (Oncinha)"
                                     maxlength="40"
                                     required>
                             </div>
@@ -470,14 +470,14 @@ if ($partidaAtiva) {
 
             <article class="card resultado-card">
                 <div class="resultado-vencedor-destaque">
-                    <?php if ($vencedorAvatar === 'cacador'): ?>
-                        <span class="pixel-avatar-grande avatar-cacador" aria-hidden="true"></span>
-                    <?php elseif ($vencedorAvatar === 'monstrinho'): ?>
-                        <span class="pixel-avatar-grande avatar-monstrinho" aria-hidden="true"></span>
+                    <?php if ($vencedorAvatar === 'bico'): ?>
+                        <span class="pixel-avatar-grande avatar-bico-armadura" aria-hidden="true"></span>
+                    <?php elseif ($vencedorAvatar === 'oncinha'): ?>
+                        <span class="pixel-avatar-grande avatar-oncinha" aria-hidden="true"></span>
                     <?php else: ?>
                         <div class="dupla-empate-avatars">
-                            <span class="pixel-avatar-grande avatar-cacador" aria-hidden="true"></span>
-                            <span class="pixel-avatar-grande avatar-monstrinho" aria-hidden="true"></span>
+                            <span class="pixel-avatar-grande avatar-bico-armadura" aria-hidden="true"></span>
+                            <span class="pixel-avatar-grande avatar-oncinha" aria-hidden="true"></span>
                         </div>
                     <?php endif; ?>
                     <h3><?= htmlspecialchars($vencedorTexto, ENT_QUOTES, 'UTF-8') ?></h3>
@@ -487,8 +487,8 @@ if ($partidaAtiva) {
                 <div class="grid" style="margin-top: 20px;">
                     <article class="card">
                         <div class="card-avatar-topo">
-                            <span class="pixel-avatar-preview avatar-cacador" aria-hidden="true"></span>
-                            <h4><?= htmlspecialchars($nomeP1, ENT_QUOTES, 'UTF-8') ?> (Caçador)</h4>
+                            <span class="pixel-avatar-preview avatar-bico-armadura" aria-hidden="true"></span>
+                            <h4><?= htmlspecialchars($nomeP1, ENT_QUOTES, 'UTF-8') ?> (Bicó Guerreiro)</h4>
                         </div>
                         <p>Questões: <?= (int) $_SESSION['dupla_p1_questoes'] ?> de 10</p>
                         <p class="destaque-numero" style="color: var(--cor-acerto) !important;">✅ <?= (int) $_SESSION['dupla_p1_acertos'] ?> acertos</p>
@@ -498,8 +498,8 @@ if ($partidaAtiva) {
 
                     <article class="card">
                         <div class="card-avatar-topo">
-                            <span class="pixel-avatar-preview avatar-monstrinho" aria-hidden="true"></span>
-                            <h4><?= htmlspecialchars($nomeP2, ENT_QUOTES, 'UTF-8') ?> (Monstrinho)</h4>
+                            <span class="pixel-avatar-preview avatar-oncinha" aria-hidden="true"></span>
+                            <h4><?= htmlspecialchars($nomeP2, ENT_QUOTES, 'UTF-8') ?> (Oncinha)</h4>
                         </div>
                         <p>Questões: <?= (int) $_SESSION['dupla_p2_questoes'] ?> de 10</p>
                         <p class="destaque-numero" style="color: var(--roxo) !important;">✅ <?= (int) $_SESSION['dupla_p2_acertos'] ?> acertos</p>
@@ -519,33 +519,33 @@ if ($partidaAtiva) {
             <?php
             $turno = (int) ($_SESSION['dupla_turno'] ?? 1);
             $nomeAtual = ($turno === 1) ? $nomeP1 : $nomeP2;
-            $papelAtual = ($turno === 1) ? 'Caçador' : 'Monstrinho';
-            $classeAvatarAtual = ($turno === 1) ? 'avatar-cacador' : 'avatar-monstrinho';
+            $papelAtual = ($turno === 1) ? 'Bicó' : 'Oncinha';
+            $classeAvatarAtual = ($turno === 1) ? 'avatar-bico-armadura' : 'avatar-oncinha';
             ?>
 
             <!-- PLACAR EM TEMPO REAL COM AVATARES EM PIXEL ART -->
             <div class="grid dupla-placar-grid" style="margin-bottom: 24px;">
                 <article class="card card-jogador <?= ($turno === 1) ? 'turno-ativo' : '' ?>">
                     <div class="card-avatar-topo">
-                        <span class="pixel-avatar-preview avatar-cacador" aria-hidden="true"></span>
+                        <span class="pixel-avatar-preview avatar-bico-armadura" aria-hidden="true"></span>
                         <div>
                             <h4><?= htmlspecialchars($nomeP1, ENT_QUOTES, 'UTF-8') ?></h4>
-                            <span class="badge-personagem">O Caçador</span>
+                            <span class="badge-personagem">Bicó Guerreiro</span>
                         </div>
                     </div>
                     <p>Desafio: <strong><?= (int) $_SESSION['dupla_p1_questoes'] ?>/10</strong></p>
                     <p>Acertos: <strong><?= (int) $_SESSION['dupla_p1_acertos'] ?></strong> | XP: ⭐ <strong><?= (int) $_SESSION['dupla_p1_xp'] ?></strong></p>
                     <?php if ($turno === 1): ?>
-                        <div class="badge-vez">🎯 SUA VEZ DE ATACAR!</div>
+                        <div class="badge-vez">⚔️ SUA VEZ DE ATACAR!</div>
                     <?php endif; ?>
                 </article>
 
                 <article class="card card-jogador <?= ($turno === 2) ? 'turno-ativo' : '' ?>">
                     <div class="card-avatar-topo">
-                        <span class="pixel-avatar-preview avatar-monstrinho" aria-hidden="true"></span>
+                        <span class="pixel-avatar-preview avatar-oncinha" aria-hidden="true"></span>
                         <div>
                             <h4><?= htmlspecialchars($nomeP2, ENT_QUOTES, 'UTF-8') ?></h4>
-                            <span class="badge-personagem badge-roxo">O Monstrinho</span>
+                            <span class="badge-personagem badge-roxo">Oncinha</span>
                         </div>
                     </div>
                     <p>Desafio: <strong><?= (int) $_SESSION['dupla_p2_questoes'] ?>/10</strong></p>

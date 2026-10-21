@@ -1,7 +1,6 @@
 <?php
 
 require_once __DIR__ . '/../../config/conexao.php';
-require_once __DIR__ . '/../../helpers/bicoHelper.php';
 
 if (empty($_SESSION['aluno_id'])) {
     header('Location: ?pagina=login');
@@ -86,12 +85,21 @@ if (!empty($_SESSION['dupla_partida_id'])) {
 // ============================================
 // 3. INICIAR UMA NOVA PARTIDA EM DUPLA
 // ============================================
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['iniciar_dupla'])) {
-    $idDificuldade = filter_input(INPUT_POST, 'id_dificuldade', FILTER_VALIDATE_INT);
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    isset($_POST['iniciar_dupla'])
+) {
+    $idDificuldade = filter_input(
+        INPUT_POST,
+        'id_dificuldade',
+        FILTER_VALIDATE_INT
+    );
+
     $apelidoP2 = trim($_POST['apelido_jogador2'] ?? '');
     if ($apelidoP2 === '') {
         $apelidoP2 = 'Jogador 2';
     }
+    // Limita tamanho do apelido
     if (mb_strlen($apelidoP2) > 40) {
         $apelidoP2 = mb_substr($apelidoP2, 0, 40);
     }
@@ -109,7 +117,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['iniciar_dupla'])) {
         $mensagemTipo = 'erro';
     } else {
         $consultaModo = $conexao->prepare(
-            'SELECT id_modo_jogo FROM modo_jogo WHERE nome = :nome LIMIT 1'
+            'SELECT id_modo_jogo
+             FROM modo_jogo
+             WHERE nome = :nome
+             LIMIT 1'
         );
         $consultaModo->execute(['nome' => 'Dupla Local']);
         $idModo = $consultaModo->fetchColumn();
@@ -118,6 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['iniciar_dupla'])) {
             $mensagem = 'Modo Dupla Local não encontrado no banco.';
             $mensagemTipo = 'erro';
         } else {
+            // Cria a partida (sem cronômetro, tempo_segundos = 0)
             $consultaPartida = $conexao->prepare(
                 "INSERT INTO partida (id_jogo, id_modo_jogo, tempo_segundos, status)
                  VALUES (1, :modo, 0, 'em_andamento')"
@@ -125,9 +137,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['iniciar_dupla'])) {
             $consultaPartida->execute(['modo' => (int) $idModo]);
             $idPartida = (int) $conexao->lastInsertId();
 
+            // Nome do Jogador 1 (aluno autenticado)
             $nomeP1 = $_SESSION['aluno_nome'] ?? 'Jogador 1';
 
-            // Jogador 1 (Caçador)
+            // Jogador 1: aluno autenticado
             $consultaP1 = $conexao->prepare(
                 'INSERT INTO partida_participante (id_partida, id_aluno, apelido, xp_total, acertos, erros)
                  VALUES (:partida, :aluno, :apelido, 0, 0, 0)'
@@ -139,7 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['iniciar_dupla'])) {
             ]);
             $idP1Participante = (int) $conexao->lastInsertId();
 
-            // Jogador 2 (Monstrinho)
+            // Jogador 2: participante local sem conta (id_aluno = NULL)
             $consultaP2 = $conexao->prepare(
                 'INSERT INTO partida_participante (id_partida, id_aluno, apelido, xp_total, acertos, erros)
                  VALUES (:partida, NULL, :apelido, 0, 0, 0)'
@@ -156,7 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['iniciar_dupla'])) {
             $_SESSION['dupla_p1_nome'] = $nomeP1;
             $_SESSION['dupla_p2_nome'] = $apelidoP2;
             $_SESSION['dupla_dificuldade'] = (int) $dificuldade['id_dificuldade'];
-            $_SESSION['dupla_turno'] = 1;
+            $_SESSION['dupla_turno'] = 1; // Jogador 1 começa
             $_SESSION['dupla_p1_questoes'] = 0;
             $_SESSION['dupla_p2_questoes'] = 0;
             $_SESSION['dupla_p1_acertos'] = 0;
@@ -179,153 +192,185 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['iniciar_dupla'])) {
 $partidaAtiva = !empty($_SESSION['dupla_partida_id']);
 $fimDeJogo = false;
 $vencedorTexto = '';
-$vencedorAvatar = 'cacador';
 
 if ($partidaAtiva) {
     $idP1 = (int) $_SESSION['dupla_p1_participante_id'];
     $idP2 = (int) $_SESSION['dupla_p2_participante_id'];
     $idPartida = (int) $_SESSION['dupla_partida_id'];
     $idDificuldade = (int) $_SESSION['dupla_dificuldade'];
-    $nomeP1 = $_SESSION['dupla_p1_nome'] ?? 'Caçador';
-    $nomeP2 = $_SESSION['dupla_p2_nome'] ?? 'Monstrinho';
-    $turnoAtual = (int) ($_SESSION['dupla_turno'] ?? 1);
+    $nomeP1 = $_SESSION['dupla_p1_nome'];
+    $nomeP2 = $_SESSION['dupla_p2_nome'];
 
-    $totalP1 = (int) $_SESSION['dupla_p1_questoes'];
-    $totalP2 = (int) $_SESSION['dupla_p2_questoes'];
-    $fimDeJogo = ($totalP1 >= 10 && $totalP2 >= 10);
+    $qP1 = (int) $_SESSION['dupla_p1_questoes'];
+    $qP2 = (int) $_SESSION['dupla_p2_questoes'];
+
+    // Fim de jogo: ambos responderam 10 questões
+    $fimDeJogo = ($qP1 >= 10 && $qP2 >= 10);
 
     // ============================================
-    // 5. PROCESSAR RESPOSTA DO TURNO
+    // 5. PROCESSAR RESPOSTA DO TURNO ATUAL
     // ============================================
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['responder_dupla']) && !$fimDeJogo) {
+    if (
+        $_SERVER['REQUEST_METHOD'] === 'POST' &&
+        isset($_POST['responder_dupla']) &&
+        !$fimDeJogo
+    ) {
         $idQuestao = filter_input(INPUT_POST, 'id_questao', FILTER_VALIDATE_INT);
         $idAlternativa = filter_input(INPUT_POST, 'id_alternativa', FILTER_VALIDATE_INT);
+        $turnoAtual = (int) ($_SESSION['dupla_turno'] ?? 1);
 
-        $idParticipanteVez = ($turnoAtual === 1) ? $idP1 : $idP2;
-        $nomeVez = ($turnoAtual === 1) ? $nomeP1 : $nomeP2;
-        $papelVez = ($turnoAtual === 1) ? 'Caçador' : 'Monstrinho';
+        $idParticipanteAtual = ($turnoAtual === 1) ? $idP1 : $idP2;
+        $nomeJogadorAtual = ($turnoAtual === 1) ? $nomeP1 : $nomeP2;
 
-        $consultaValida = $conexao->prepare(
-            'SELECT a.correta, q.enunciado, q.explicacao_curta
-             FROM alternativa a
-             JOIN questao q ON q.id_questao = a.id_questao
-             WHERE a.id_alternativa = :alternativa
-               AND a.id_questao = :questao
-               AND q.id_jogo = 1
-               AND q.id_dificuldade = :dificuldade
-               AND q.ativo = 1
-             LIMIT 1'
+        // Confirma que a questão pertence ao jogo 1 e à dificuldade da partida
+        $consultaQuestao = $conexao->prepare(
+            'SELECT id_questao, explicacao_curta
+             FROM questao
+             WHERE id_questao = :questao
+               AND id_jogo = 1
+               AND id_dificuldade = :dificuldade
+               AND ativo = 1
+               AND id_questao IN (
+                   SELECT id_questao
+                   FROM alternativa
+                   WHERE id_alternativa = :alternativa
+               )'
         );
-        $consultaValida->execute([
-            'alternativa' => $idAlternativa,
+        $consultaQuestao->execute([
             'questao' => $idQuestao,
-            'dificuldade' => $idDificuldade
+            'dificuldade' => $idDificuldade,
+            'alternativa' => $idAlternativa
         ]);
-        $dadosResp = $consultaValida->fetch(PDO::FETCH_ASSOC);
+        $dadosQuestao = $consultaQuestao->fetch(PDO::FETCH_ASSOC);
 
-        if ($dadosResp) {
-            $acertou = ((int) $dadosResp['correta'] === 1);
-            $xpGanho = 0;
-
-            if ($acertou) {
-                $consultaXP = $conexao->prepare(
-                    'SELECT xp_por_acerto FROM dificuldade WHERE id_dificuldade = :dif'
-                );
-                $consultaXP->execute(['dif' => $idDificuldade]);
-                $xpGanho = (int) $consultaXP->fetchColumn();
-            }
-
-            // Registra resposta
-            $consultaIns = $conexao->prepare(
-                'INSERT INTO resposta (id_participante, id_questao, id_alternativa, acertou, xp_ganho)
-                 VALUES (:participante, :questao, :alternativa, :acertou, :xp)'
+        if ($dadosQuestao) {
+            // Verifica se a alternativa é correta
+            $consultaCorreta = $conexao->prepare(
+                'SELECT correta
+                 FROM alternativa
+                 WHERE id_alternativa = :alternativa
+                   AND id_questao = :questao'
             );
-            $consultaIns->execute([
-                'participante' => $idParticipanteVez,
-                'questao' => $idQuestao,
+            $consultaCorreta->execute([
                 'alternativa' => $idAlternativa,
-                'acertou' => $acertou ? 1 : 0,
-                'xp' => $xpGanho
+                'questao' => $idQuestao
             ]);
+            $correta = $consultaCorreta->fetchColumn();
 
-            // Atualiza participante
-            $consultaUpd = $conexao->prepare(
-                'UPDATE partida_participante
-                 SET xp_total = xp_total + :xp,
-                     acertos = acertos + :acertos,
-                     erros = erros + :erros
-                 WHERE id_participante = :participante'
-            );
-            $consultaUpd->execute([
-                'xp' => $xpGanho,
-                'acertos' => $acertou ? 1 : 0,
-                'erros' => $acertou ? 0 : 1,
-                'participante' => $idParticipanteVez
-            ]);
+            if ($correta !== false) {
+                $acertou = ((int) $correta === 1);
+                $xpGanho = 0;
 
-            // Atualiza sessão
-            if ($turnoAtual === 1) {
-                $_SESSION['dupla_p1_questoes']++;
                 if ($acertou) {
-                    $_SESSION['dupla_p1_acertos']++;
-                    $_SESSION['dupla_p1_xp'] += $xpGanho;
-                } else {
-                    $_SESSION['dupla_p1_erros']++;
+                    $consultaXP = $conexao->prepare(
+                        'SELECT xp_por_acerto FROM dificuldade WHERE id_dificuldade = :dificuldade'
+                    );
+                    $consultaXP->execute(['dificuldade' => $idDificuldade]);
+                    $xpGanho = (int) $consultaXP->fetchColumn();
                 }
-            } else {
-                $_SESSION['dupla_p2_questoes']++;
-                if ($acertou) {
-                    $_SESSION['dupla_p2_acertos']++;
-                    $_SESSION['dupla_p2_xp'] += $xpGanho;
-                } else {
-                    $_SESSION['dupla_p2_erros']++;
-                }
-            }
 
-            $dicaBico = gerarDicaBico($dadosResp['enunciado'], $dadosResp['explicacao_curta'] ?? '');
-
-            if ($acertou) {
-                $feedMsg = "✨ Grande jogada de {$nomeVez} ({$papelVez})! Resposta correta (+{$xpGanho} XP)!";
-                $feedTipo = 'acerto';
-            } else {
-                $feedMsg = "🦉 {$nomeVez} ({$papelVez}) quase acertou! Mas errar é praticar, confira o cálculo:";
-                $feedTipo = 'erro';
-            }
-
-            $_SESSION['dupla_feedback'] = [
-                'tipo' => $feedTipo,
-                'texto' => $feedMsg,
-                'explicacao' => $dicaBico
-            ];
-
-            // Alterna o turno
-            $novaQ1 = (int) $_SESSION['dupla_p1_questoes'];
-            $novaQ2 = (int) $_SESSION['dupla_p2_questoes'];
-
-            if ($novaQ1 < 10 && $novaQ2 < 10) {
-                $_SESSION['dupla_turno'] = ($turnoAtual === 1) ? 2 : 1;
-            } elseif ($novaQ1 < 10) {
-                $_SESSION['dupla_turno'] = 1;
-            } elseif ($novaQ2 < 10) {
-                $_SESSION['dupla_turno'] = 2;
-            }
-
-            if ($novaQ1 >= 10 && $novaQ2 >= 10) {
-                $consultaFim = $conexao->prepare(
-                    "UPDATE partida SET status = 'finalizada', data_fim = NOW() WHERE id_partida = :partida AND status = 'em_andamento'"
+                // Registra a resposta no banco associada ao participante do turno
+                $consultaRegistro = $conexao->prepare(
+                    'INSERT INTO resposta (id_participante, id_questao, id_alternativa, acertou, xp_ganho)
+                     VALUES (:participante, :questao, :alternativa, :acertou, :xp)'
                 );
-                $consultaFim->execute(['partida' => $idPartida]);
-            }
+                $consultaRegistro->execute([
+                    'participante' => $idParticipanteAtual,
+                    'questao' => $idQuestao,
+                    'alternativa' => $idAlternativa,
+                    'acertou' => $acertou ? 1 : 0,
+                    'xp' => $xpGanho
+                ]);
 
-            header('Location: ?pagina=dupla');
-            exit;
+                // Atualiza estatísticas do participante na tabela partida_participante
+                $consultaAtualiza = $conexao->prepare(
+                    'UPDATE partida_participante
+                     SET xp_total = xp_total + :xp,
+                         acertos = acertos + :acertos,
+                         erros = erros + :erros
+                     WHERE id_participante = :participante'
+                );
+                $consultaAtualiza->execute([
+                    'xp' => $xpGanho,
+                    'acertos' => $acertou ? 1 : 0,
+                    'erros' => $acertou ? 0 : 1,
+                    'participante' => $idParticipanteAtual
+                ]);
+
+                // Atualiza contadores na sessão
+                if ($turnoAtual === 1) {
+                    $_SESSION['dupla_p1_questoes']++;
+                    if ($acertou) {
+                        $_SESSION['dupla_p1_acertos']++;
+                        $_SESSION['dupla_p1_xp'] += $xpGanho;
+                    } else {
+                        $_SESSION['dupla_p1_erros']++;
+                    }
+                } else {
+                    $_SESSION['dupla_p2_questoes']++;
+                    if ($acertou) {
+                        $_SESSION['dupla_p2_acertos']++;
+                        $_SESSION['dupla_p2_xp'] += $xpGanho;
+                    } else {
+                        $_SESSION['dupla_p2_erros']++;
+                    }
+                }
+
+                // Mensagem de feedback
+                if ($acertou) {
+                    $feedbackMsg = "Acertou! $nomeJogadorAtual conquistou $xpGanho XP!";
+                    $feedbackTipo = 'acerto';
+                } else {
+                    $feedbackMsg = "Não foi dessa vez para $nomeJogadorAtual! Tudo bem errar, continue firme!";
+                    $feedbackTipo = 'erro';
+                }
+
+                $_SESSION['dupla_feedback'] = [
+                    'tipo' => $feedbackTipo,
+                    'texto' => $feedbackMsg,
+                    'explicacao' => $dadosQuestao['explicacao_curta'] ?? ''
+                ];
+
+                // Alterna o turno
+                $novaQ1 = (int) $_SESSION['dupla_p1_questoes'];
+                $novaQ2 = (int) $_SESSION['dupla_p2_questoes'];
+
+                if ($turnoAtual === 1) {
+                    // Passa a vez para o jogador 2 se ainda tiver questões
+                    if ($novaQ2 < 10) {
+                        $_SESSION['dupla_turno'] = 2;
+                    }
+                } else {
+                    // Passa a vez para o jogador 1 se ainda tiver questões
+                    if ($novaQ1 < 10) {
+                        $_SESSION['dupla_turno'] = 1;
+                    }
+                }
+
+                // Se ambos completaram 10 questões, finaliza a partida
+                if ($novaQ1 >= 10 && $novaQ2 >= 10) {
+                    $consultaFim = $conexao->prepare(
+                        "UPDATE partida
+                         SET status = 'finalizada',
+                             data_fim = NOW()
+                         WHERE id_partida = :partida
+                           AND status = 'em_andamento'"
+                    );
+                    $consultaFim->execute(['partida' => $idPartida]);
+                }
+
+                header('Location: ?pagina=dupla');
+                exit;
+            }
         }
     }
 
+    // Recalcula contadores e fim de jogo
     $qP1 = (int) $_SESSION['dupla_p1_questoes'];
     $qP2 = (int) $_SESSION['dupla_p2_questoes'];
     $fimDeJogo = ($qP1 >= 10 && $qP2 >= 10);
 
+    // Recupera feedback da rodada anterior, se houver
     if (!empty($_SESSION['dupla_feedback'])) {
         $mensagem = $_SESSION['dupla_feedback']['texto'];
         $mensagemTipo = $_SESSION['dupla_feedback']['tipo'];
@@ -339,14 +384,17 @@ if ($partidaAtiva) {
     if (!$fimDeJogo) {
         $turnoAtual = (int) ($_SESSION['dupla_turno'] ?? 1);
 
+        // Busca questão sem repetir nenhuma que já foi respondida nesta partida (por nenhum dos 2 jogadores)
         $consultaQ = $conexao->prepare(
-            'SELECT id_questao, enunciado, explicacao_curta
+            'SELECT id_questao, enunciado
              FROM questao
              WHERE id_jogo = 1
                AND id_dificuldade = :dificuldade
                AND ativo = 1
                AND id_questao NOT IN (
-                   SELECT id_questao FROM resposta WHERE id_participante IN (:p1, :p2)
+                   SELECT id_questao
+                   FROM resposta
+                   WHERE id_participante IN (:p1, :p2)
                )
              ORDER BY RAND()
              LIMIT 1'
@@ -360,14 +408,22 @@ if ($partidaAtiva) {
 
         if ($questao) {
             $consultaAlt = $conexao->prepare(
-                'SELECT id_alternativa, texto FROM alternativa WHERE id_questao = :questao ORDER BY id_alternativa'
+                'SELECT id_alternativa, texto
+                 FROM alternativa
+                 WHERE id_questao = :questao
+                 ORDER BY id_alternativa'
             );
             $consultaAlt->execute(['questao' => (int) $questao['id_questao']]);
             $alternativas = $consultaAlt->fetchAll(PDO::FETCH_ASSOC);
         } else {
+            // Sem mais questões disponíveis nesta dificuldade
             $fimDeJogo = true;
             $consultaFim = $conexao->prepare(
-                "UPDATE partida SET status = 'finalizada', data_fim = NOW() WHERE id_partida = :partida AND status = 'em_andamento'"
+                "UPDATE partida
+                 SET status = 'finalizada',
+                     data_fim = NOW()
+                 WHERE id_partida = :partida
+                   AND status = 'em_andamento'"
             );
             $consultaFim->execute(['partida' => $idPartida]);
         }
@@ -378,14 +434,11 @@ if ($partidaAtiva) {
         $acertos2 = (int) $_SESSION['dupla_p2_acertos'];
 
         if ($acertos1 > $acertos2) {
-            $vencedorTexto = "🏆 Vitória de {$nomeP1} (O Caçador)!";
-            $vencedorAvatar = 'cacador';
+            $vencedorTexto = "🏆 Vitória de $nomeP1!";
         } elseif ($acertos2 > $acertos1) {
-            $vencedorTexto = "🏆 Vitória de {$nomeP2} (O Monstrinho)!";
-            $vencedorAvatar = 'monstrinho';
+            $vencedorTexto = "🏆 Vitória de $nomeP2!";
         } else {
-            $vencedorTexto = "🤝 Empate Mágico! Ambos os aventureiros foram brilhantes!";
-            $vencedorAvatar = 'ambos';
+            $vencedorTexto = "🤝 Empate! Ambos foram incríveis!";
         }
     }
 }
@@ -393,58 +446,58 @@ if ($partidaAtiva) {
 
 <main class="container">
     <section class="hero">
-        <span class="badge">Batalha na Floresta · Modo Dupla Local</span>
-        <h2>Duelo na Floresta (Caçador vs Monstrinho)</h2>
-        <p>Dois aventureiros no mesmo teclado com a estética mágica de Numéria!</p>
+        <span class="badge">Batalha na Floresta</span>
+        <h2>Modo Dupla Local</h2>
+        <p>Dois aventureiros no mesmo teclado em turnos alternados!</p>
 
-        <!-- FEEDBACK DO BICÓ -->
         <?php if ($mensagem !== ''): ?>
-            <?= renderBicoFeedbackHtml($mensagem, $mensagemTipo, $explicacao) ?>
+            <div role="status" class="feedback-msg <?= ($mensagemTipo === 'acerto') ? 'feedback-sucesso' : 'feedback-erro' ?>">
+                <p><strong><?= htmlspecialchars($mensagem, ENT_QUOTES, 'UTF-8') ?></strong></p>
+                <?php if ($explicacao !== ''): ?>
+                    <p class="explicacao"><?= htmlspecialchars($explicacao, ENT_QUOTES, 'UTF-8') ?></p>
+                <?php endif; ?>
+            </div>
         <?php endif; ?>
 
         <?php if (!$partidaAtiva): ?>
 
             <article class="card">
-                <h3>Configurar Duelo em Dupla</h3>
-                <p>O <strong>Jogador 1</strong> é o Caçador e o <strong>Jogador 2</strong> é o Monstrinho da Floresta em pixel art.</p>
+                <h3>Configurar Partida em Dupla</h3>
+                <p>O <strong>Jogador 1</strong> é o aluno conectado. O <strong>Jogador 2</strong> joga como convidado local.</p>
 
                 <?php
                 $consultaDificuldades = $conexao->query(
-                    'SELECT id_dificuldade, nome, xp_por_acerto FROM dificuldade ORDER BY id_dificuldade'
+                    'SELECT id_dificuldade, nome, xp_por_acerto
+                     FROM dificuldade
+                     ORDER BY id_dificuldade'
                 );
                 $dificuldades = $consultaDificuldades->fetchAll(PDO::FETCH_ASSOC);
                 ?>
 
                 <form method="POST">
-                    <div style="margin-bottom: 20px;">
+                    <div style="margin-bottom: 16px;">
                         <label>
-                            <strong>Jogador 1 — O Caçador da Floresta:</strong><br>
-                            <div class="input-com-avatar">
-                                <span class="pixel-avatar-preview avatar-cacador" aria-hidden="true"></span>
-                                <input type="text" value="<?= htmlspecialchars($_SESSION['aluno_nome'] ?? 'Jogador 1', ENT_QUOTES, 'UTF-8') ?>" disabled>
-                            </div>
+                            <strong>Jogador 1 (Você - Caçador):</strong><br>
+                            <input type="text" value="<?= htmlspecialchars($_SESSION['aluno_nome'] ?? 'Jogador 1', ENT_QUOTES, 'UTF-8') ?>" disabled>
                         </label>
                     </div>
 
-                    <div style="margin-bottom: 20px;">
+                    <div style="margin-bottom: 16px;">
                         <label for="apelido_jogador2">
-                            <strong>Jogador 2 — O Monstrinho Mágico:</strong><br>
-                            <div class="input-com-avatar">
-                                <span class="pixel-avatar-preview avatar-monstrinho" aria-hidden="true"></span>
-                                <input
-                                    type="text"
-                                    name="apelido_jogador2"
-                                    id="apelido_jogador2"
-                                    placeholder="Apelido do amigo (Monstrinho)"
-                                    maxlength="40"
-                                    required>
-                            </div>
+                            <strong>Jogador 2 (Convidado - Monstrinho):</strong><br>
+                            <input
+                                type="text"
+                                name="apelido_jogador2"
+                                id="apelido_jogador2"
+                                placeholder="Nome ou apelido do amigo"
+                                maxlength="40"
+                                required>
                         </label>
                     </div>
 
-                    <div style="margin-bottom: 20px;">
+                    <div style="margin-bottom: 16px;">
                         <label for="id_dificuldade">
-                            <strong>Dificuldade dos Desafios:</strong><br>
+                            <strong>Dificuldade:</strong><br>
                             <select name="id_dificuldade" id="id_dificuldade" required>
                                 <option value="">Selecione uma dificuldade</option>
                                 <?php foreach ($dificuldades as $dif): ?>
@@ -457,7 +510,7 @@ if ($partidaAtiva) {
                     </div>
 
                     <button type="submit" name="iniciar_dupla" value="1" class="btn">
-                        Iniciar Duelo em Dupla
+                        Iniciar Batalha em Dupla
                     </button>
                 </form>
             </article>
@@ -469,42 +522,24 @@ if ($partidaAtiva) {
         <?php elseif ($fimDeJogo): ?>
 
             <article class="card resultado-card">
-                <div class="resultado-vencedor-destaque">
-                    <?php if ($vencedorAvatar === 'cacador'): ?>
-                        <span class="pixel-avatar-grande avatar-cacador" aria-hidden="true"></span>
-                    <?php elseif ($vencedorAvatar === 'monstrinho'): ?>
-                        <span class="pixel-avatar-grande avatar-monstrinho" aria-hidden="true"></span>
-                    <?php else: ?>
-                        <div class="dupla-empate-avatars">
-                            <span class="pixel-avatar-grande avatar-cacador" aria-hidden="true"></span>
-                            <span class="pixel-avatar-grande avatar-monstrinho" aria-hidden="true"></span>
-                        </div>
-                    <?php endif; ?>
-                    <h3><?= htmlspecialchars($vencedorTexto, ENT_QUOTES, 'UTF-8') ?></h3>
-                </div>
-                <p>O duelo de matemática na floresta foi concluído! O Bicó parabeniza os dois heróis:</p>
+                <h3><?= htmlspecialchars($vencedorTexto, ENT_QUOTES, 'UTF-8') ?></h3>
+                <p>A batalha matemática entre os dois aventureiros chegou ao fim!</p>
 
                 <div class="grid" style="margin-top: 20px;">
                     <article class="card">
-                        <div class="card-avatar-topo">
-                            <span class="pixel-avatar-preview avatar-cacador" aria-hidden="true"></span>
-                            <h4><?= htmlspecialchars($nomeP1, ENT_QUOTES, 'UTF-8') ?> (Caçador)</h4>
-                        </div>
+                        <h4>🏹 <?= htmlspecialchars($nomeP1, ENT_QUOTES, 'UTF-8') ?> (Jogador 1)</h4>
                         <p>Questões: <?= (int) $_SESSION['dupla_p1_questoes'] ?> de 10</p>
-                        <p class="destaque-numero" style="color: var(--cor-acerto) !important;">✅ <?= (int) $_SESSION['dupla_p1_acertos'] ?> acertos</p>
+                        <p>Acertos: <strong><?= (int) $_SESSION['dupla_p1_acertos'] ?></strong></p>
                         <p>Erros: <?= (int) $_SESSION['dupla_p1_erros'] ?></p>
-                        <p>XP: <strong>⭐ <?= (int) $_SESSION['dupla_p1_xp'] ?> XP</strong></p>
+                        <p>XP conquistado: <strong><?= (int) $_SESSION['dupla_p1_xp'] ?> XP</strong></p>
                     </article>
 
                     <article class="card">
-                        <div class="card-avatar-topo">
-                            <span class="pixel-avatar-preview avatar-monstrinho" aria-hidden="true"></span>
-                            <h4><?= htmlspecialchars($nomeP2, ENT_QUOTES, 'UTF-8') ?> (Monstrinho)</h4>
-                        </div>
+                        <h4>🐾 <?= htmlspecialchars($nomeP2, ENT_QUOTES, 'UTF-8') ?> (Jogador 2)</h4>
                         <p>Questões: <?= (int) $_SESSION['dupla_p2_questoes'] ?> de 10</p>
-                        <p class="destaque-numero" style="color: var(--roxo) !important;">✅ <?= (int) $_SESSION['dupla_p2_acertos'] ?> acertos</p>
+                        <p>Acertos: <strong><?= (int) $_SESSION['dupla_p2_acertos'] ?></strong></p>
                         <p>Erros: <?= (int) $_SESSION['dupla_p2_erros'] ?></p>
-                        <p>XP: <strong>⭐ <?= (int) $_SESSION['dupla_p2_xp'] ?> XP</strong></p>
+                        <p>XP conquistado: <strong><?= (int) $_SESSION['dupla_p2_xp'] ?> XP</strong></p>
                     </article>
                 </div>
 
@@ -519,86 +554,56 @@ if ($partidaAtiva) {
             <?php
             $turno = (int) ($_SESSION['dupla_turno'] ?? 1);
             $nomeAtual = ($turno === 1) ? $nomeP1 : $nomeP2;
-            $papelAtual = ($turno === 1) ? 'Caçador' : 'Monstrinho';
-            $classeAvatarAtual = ($turno === 1) ? 'avatar-cacador' : 'avatar-monstrinho';
+            $papelAtual = ($turno === 1) ? '🏹 Caçador (Jogador 1)' : '🐾 Monstrinho (Jogador 2)';
             ?>
 
-            <!-- PLACAR EM TEMPO REAL COM AVATARES EM PIXEL ART -->
-            <div class="grid dupla-placar-grid" style="margin-bottom: 24px;">
-                <article class="card card-jogador <?= ($turno === 1) ? 'turno-ativo' : '' ?>">
-                    <div class="card-avatar-topo">
-                        <span class="pixel-avatar-preview avatar-cacador" aria-hidden="true"></span>
-                        <div>
-                            <h4><?= htmlspecialchars($nomeP1, ENT_QUOTES, 'UTF-8') ?></h4>
-                            <span class="badge-personagem">O Caçador</span>
-                        </div>
-                    </div>
-                    <p>Desafio: <strong><?= (int) $_SESSION['dupla_p1_questoes'] ?>/10</strong></p>
-                    <p>Acertos: <strong><?= (int) $_SESSION['dupla_p1_acertos'] ?></strong> | XP: ⭐ <strong><?= (int) $_SESSION['dupla_p1_xp'] ?></strong></p>
+            <!-- Placar em tempo real -->
+            <div class="grid" style="margin-bottom: 24px;">
+                <article class="card <?= ($turno === 1) ? 'turno-ativo' : '' ?>">
+                    <h4>🏹 <?= htmlspecialchars($nomeP1, ENT_QUOTES, 'UTF-8') ?></h4>
+                    <p>Questões: <?= (int) $_SESSION['dupla_p1_questoes'] ?>/10</p>
+                    <p>Acertos: <strong><?= (int) $_SESSION['dupla_p1_acertos'] ?></strong> | XP: <?= (int) $_SESSION['dupla_p1_xp'] ?></p>
                     <?php if ($turno === 1): ?>
-                        <div class="badge-vez">🎯 SUA VEZ DE ATACAR!</div>
+                        <span class="badge">SUA VEZ DE JOGAR</span>
                     <?php endif; ?>
                 </article>
 
-                <article class="card card-jogador <?= ($turno === 2) ? 'turno-ativo' : '' ?>">
-                    <div class="card-avatar-topo">
-                        <span class="pixel-avatar-preview avatar-monstrinho" aria-hidden="true"></span>
-                        <div>
-                            <h4><?= htmlspecialchars($nomeP2, ENT_QUOTES, 'UTF-8') ?></h4>
-                            <span class="badge-personagem badge-roxo">O Monstrinho</span>
-                        </div>
-                    </div>
-                    <p>Desafio: <strong><?= (int) $_SESSION['dupla_p2_questoes'] ?>/10</strong></p>
-                    <p>Acertos: <strong><?= (int) $_SESSION['dupla_p2_acertos'] ?></strong> | XP: ⭐ <strong><?= (int) $_SESSION['dupla_p2_xp'] ?></strong></p>
+                <article class="card <?= ($turno === 2) ? 'turno-ativo' : '' ?>">
+                    <h4>🐾 <?= htmlspecialchars($nomeP2, ENT_QUOTES, 'UTF-8') ?></h4>
+                    <p>Questões: <?= (int) $_SESSION['dupla_p2_questoes'] ?>/10</p>
+                    <p>Acertos: <strong><?= (int) $_SESSION['dupla_p2_acertos'] ?></strong> | XP: <?= (int) $_SESSION['dupla_p2_xp'] ?></p>
                     <?php if ($turno === 2): ?>
-                        <div class="badge-vez">🐾 SUA VEZ DE ATACAR!</div>
+                        <span class="badge">SUA VEZ DE JOGAR</span>
                     <?php endif; ?>
                 </article>
             </div>
 
-            <!-- FAIXA DE DESTAQUE DO TURNO -->
-            <div class="destaque-turno turno-banner-pixel">
-                <div class="turno-flex">
-                    <span class="pixel-avatar-preview <?= $classeAvatarAtual ?>" aria-hidden="true"></span>
-                    <h3>Vez de <?= htmlspecialchars($nomeAtual, ENT_QUOTES, 'UTF-8') ?> (<?= $papelAtual ?>)</h3>
-                </div>
+            <div class="destaque-turno" style="margin-bottom: 16px;">
+                <h3>Vez de <?= htmlspecialchars($nomeAtual, ENT_QUOTES, 'UTF-8') ?> (<?= $papelAtual ?>)</h3>
             </div>
 
             <?php if ($questao): ?>
-                <?php
-                $dicaDupla = gerarDicaBico($questao['enunciado'], $questao['explicacao_curta'] ?? '');
-                ?>
                 <article class="card">
-                    <span class="badge">Desafio de <?= $papelAtual ?></span>
-                    <h3 style="font-size: 1.4rem; margin: 14px 0;">
-                        <?= htmlspecialchars($questao['enunciado'], ENT_QUOTES, 'UTF-8') ?>
-                    </h3>
-
-                    <!-- DICA DO BICÓ EM DUPLA -->
-                    <?= renderBicoDicaBotaoHtml($dicaDupla) ?>
+                    <h3><?= htmlspecialchars($questao['enunciado'], ENT_QUOTES, 'UTF-8') ?></h3>
 
                     <?php if ($alternativas): ?>
-                        <form method="POST" style="margin-top: 18px;">
+                        <form method="POST">
                             <input type="hidden" name="id_questao" value="<?= (int) $questao['id_questao'] ?>">
 
-                            <fieldset>
-                                <legend class="sr-only">Escolha a resposta correta</legend>
-                                <?php foreach ($alternativas as $alt): ?>
-                                    <label>
-                                        <input
-                                            type="radio"
-                                            name="id_alternativa"
-                                            value="<?= (int) $alt['id_alternativa'] ?>"
-                                            required>
-                                        <strong><?= htmlspecialchars($alt['texto'], ENT_QUOTES, 'UTF-8') ?></strong>
-                                    </label>
-                                    <br>
-                                <?php endforeach; ?>
-                            </fieldset>
+                            <?php foreach ($alternativas as $alt): ?>
+                                <label>
+                                    <input
+                                        type="radio"
+                                        name="id_alternativa"
+                                        value="<?= (int) $alt['id_alternativa'] ?>"
+                                        required>
+                                    <?= htmlspecialchars($alt['texto'], ENT_QUOTES, 'UTF-8') ?>
+                                </label>
+                            <?php endforeach; ?>
 
-                            <div style="margin-top: 18px;">
+                            <div style="margin-top: 16px;">
                                 <button type="submit" name="responder_dupla" value="1" class="btn">
-                                    Confirmar Ataque de <?= htmlspecialchars($nomeAtual, ENT_QUOTES, 'UTF-8') ?>
+                                    Confirmar Resposta de <?= htmlspecialchars($nomeAtual, ENT_QUOTES, 'UTF-8') ?>
                                 </button>
                             </div>
                         </form>

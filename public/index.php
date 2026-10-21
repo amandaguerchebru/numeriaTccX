@@ -1,3 +1,4 @@
+
 <?php
 
 session_start();
@@ -18,7 +19,6 @@ $paginasPermitidas = [
     'historico',
     'guardiao',
     'dupla',
-    'abandonar_desafio',
     'abandonar_guardiao',
     'abandonar_dupla',
     'abandonar_pocoes'
@@ -50,6 +50,8 @@ if (
     exit;
 }
 
+
+
 // ENCERRAR SESSÃO
 if ($pagina === 'sair') {
     $_SESSION = [];
@@ -59,7 +61,7 @@ if ($pagina === 'sair') {
     exit;
 }
 
-// FINALIZAR DESAFIO PELO CRONÔMETRO (60 SEGUNDOS)
+// FINALIZAR DESAFIO PELO CRONÔMETRO
 if ($pagina === 'finalizar_desafio') {
 
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -77,8 +79,8 @@ if ($pagina === 'finalizar_desafio') {
         exit('Partida não encontrada.');
     }
 
-    // Confirma que os 60 segundos já passaram.
-    if (time() - (int) $_SESSION['desafio_inicio'] < 60) {
+    // Confirma que os 180 segundos já passaram.
+    if (time() - (int) $_SESSION['desafio_inicio'] < 180) {
         http_response_code(400);
         exit('O tempo da partida ainda não terminou.');
     }
@@ -110,6 +112,7 @@ if ($pagina === 'finalizar_desafio') {
         exit('Partida finalizada.');
     }
 
+    // Se já estiver finalizada, não precisa atualizá-la novamente.
     $consultaStatus = $conexao->prepare(
         "SELECT status
          FROM partida
@@ -126,48 +129,6 @@ if ($pagina === 'finalizar_desafio') {
 
     http_response_code(403);
     exit('Não foi possível finalizar esta partida.');
-}
-
-// ABANDONAR DESAFIO RELÂMPAGO
-if ($pagina === 'abandonar_desafio') {
-    if (!empty($_SESSION['aluno_id']) && !empty($_SESSION['desafio_partida_id'])) {
-        require_once __DIR__ . '/../app/config/conexao.php';
-
-        $idPartida = (int) $_SESSION['desafio_partida_id'];
-        $idAluno = (int) $_SESSION['aluno_id'];
-
-        $consultaAbandono = $conexao->prepare(
-            "UPDATE partida
-             SET status = 'abandonada',
-                 data_fim = NOW()
-             WHERE id_partida = :partida
-               AND status = 'em_andamento'
-               AND EXISTS (
-                   SELECT 1
-                   FROM partida_participante
-                   WHERE partida_participante.id_partida = partida.id_partida
-                     AND partida_participante.id_aluno = :aluno
-               )"
-        );
-
-        $consultaAbandono->execute([
-            'partida' => $idPartida,
-            'aluno' => $idAluno
-        ]);
-    }
-
-    unset(
-        $_SESSION['desafio_partida_id'],
-        $_SESSION['desafio_participante_id'],
-        $_SESSION['desafio_inicio'],
-        $_SESSION['desafio_xp'],
-        $_SESSION['desafio_acertos'],
-        $_SESSION['desafio_erros'],
-        $_SESSION['desafio_feedback']
-    );
-
-    header('Location: ?pagina=batalha');
-    exit;
 }
 
 // ABANDONAR CONTRA O GUARDIÃO
@@ -295,8 +256,7 @@ if ($pagina === 'abandonar_guardiao') {
         $_SESSION['guardiao_xp'],
         $_SESSION['guardiao_acertos'],
         $_SESSION['guardiao_erros'],
-        $_SESSION['guardiao_dificuldade'],
-        $_SESSION['guardiao_feedback']
+        $_SESSION['guardiao_dificuldade']
     );
 
     header('Location: ?pagina=batalha');
@@ -333,21 +293,19 @@ if ($pagina === 'abandonar_dupla') {
 
     unset(
         $_SESSION['dupla_partida_id'],
-        $_SESSION['dupla_p1_participante_id'],
-        $_SESSION['dupla_p2_participante_id'],
-        $_SESSION['dupla_p1_nome'],
-        $_SESSION['dupla_p2_nome'],
+        $_SESSION['dupla_participante1_id'],
+        $_SESSION['dupla_participante2_id'],
+        $_SESSION['dupla_jogador2_nome'],
+        $_SESSION['dupla_turno_atual'],
+        $_SESSION['dupla_rodada'],
         $_SESSION['dupla_dificuldade'],
-        $_SESSION['dupla_turno'],
-        $_SESSION['dupla_p1_questoes'],
-        $_SESSION['dupla_p2_questoes'],
-        $_SESSION['dupla_p1_acertos'],
-        $_SESSION['dupla_p1_erros'],
-        $_SESSION['dupla_p1_xp'],
-        $_SESSION['dupla_p2_acertos'],
-        $_SESSION['dupla_p2_erros'],
-        $_SESSION['dupla_p2_xp'],
-        $_SESSION['dupla_feedback']
+        $_SESSION['dupla_questao_atual'],
+        $_SESSION['dupla_acertos_p1'],
+        $_SESSION['dupla_erros_p1'],
+        $_SESSION['dupla_xp_p1'],
+        $_SESSION['dupla_acertos_p2'],
+        $_SESSION['dupla_erros_p2'],
+        $_SESSION['dupla_xp_p2']
     );
 
     header('Location: ?pagina=batalha');
@@ -389,15 +347,14 @@ if ($pagina === 'abandonar_pocoes') {
         $_SESSION['pocoes_questoes'],
         $_SESSION['pocoes_xp'],
         $_SESSION['pocoes_acertos'],
-        $_SESSION['pocoes_erros'],
-        $_SESSION['pocoes_feedback']
+        $_SESSION['pocoes_erros']
     );
 
     header('Location: ?pagina=home#jogos');
     exit;
 }
 
-// PROCESSAR FORMULÁRIOS DE CADASTRO E LOGIN
+// PROCESSAR FORMULÁRIOS
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($pagina === 'cadastro') {
