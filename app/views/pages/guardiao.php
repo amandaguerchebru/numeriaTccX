@@ -538,7 +538,7 @@ if ($partidaAtiva) {
     $xpTotal = (int) $resumo['xp_total'];
     $acertos = (int) $resumo['acertos'];
     $erros = (int) $resumo['erros'];
-    $fimDeJogo = $vidasJogador <= 0 || $totalQuestoes >= 0;
+    $fimDeJogo = $vidasJogador <= 0 || $totalQuestoes >= 10;
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['responder']) && !$fimDeJogo) {
         $idQuestaoEnviada = filter_input(
@@ -691,7 +691,7 @@ if ($partidaAtiva) {
                         'aluno' => $idAluno
                     ]);
 
-                    $fimResposta = $novasVidasJogador <= 0 || $novoTotalQuestoes >= 0;
+                    $fimResposta = $novasVidasJogador <= 0 || $novoTotalQuestoes >= 10;
                     $idProximaQuestao = null;
 
                     if (!$fimResposta) {
@@ -756,15 +756,6 @@ if ($partidaAtiva) {
                     }
 
                     $conexao->commit();
-
-                    if ($novasVidasGuardiao <= 0) {
-                        $mensagem = 'Incrível! Você acertou 3 vezes e derrotou o Guardião Ancestral! Ganhou ' . $xpGanho . ' XP!';
-                    } else {
-                        $mensagem = $acertouResposta
-                            ? 'Resposta correta! O Guardião foi atingido e você ganhou ' . $xpGanho . ' XP!'
-                            : 'Ops, talvez não seja essa a resposta correta… Você perdeu uma vida, mas tudo bem errar!';
-                    }
-
                     $mensagem = $acertouResposta
                         ? 'Resposta correta! O Guardião foi atingido e você ganhou ' . $xpGanho . ' XP!'
                         : 'Ops, talvez não seja essa a resposta correta… Você perdeu uma vida, mas tudo bem errar!';
@@ -812,7 +803,7 @@ if ($partidaAtiva) {
     $vidasJogador = (int) $estado['vidas_jogador'];
     $vidasGuardiao = (int) $estado['vidas_guardiao'];
     $totalQuestoes = (int) $estado['questoes_respondidas'];
-    $fimDeJogo = $vidasJogador <= 0 || $vidasGuardiao <= 0 || $totalQuestoes >= 10;
+    $fimDeJogo = $vidasJogador <= 0 || $totalQuestoes >= 10;
 
     if (!$fimDeJogo && $estado['id_questao_atual'] === null) {
         $conexao->beginTransaction();
