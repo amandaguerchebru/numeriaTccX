@@ -6,6 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo APP_NAME; ?></title>
     <meta name="description" content="Plataforma educacional Numéria">
+    
+    <!-- FAVICON DO BICÓ FELIZ AQUI: -->
+     <link rel="icon" type="image/png" href="<?php echo asset('assets/img/bico-favicon.png'); ?>">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
