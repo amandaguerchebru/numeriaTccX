@@ -2,6 +2,7 @@
 <?php
 
 require_once __DIR__ . '/../config/conexao.php';
+require_once __DIR__ . '/../helpers/usuario.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ?pagina=cadastro');
@@ -12,6 +13,8 @@ $nome = trim($_POST['nome'] ?? '');
 $email = trim($_POST['email'] ?? '');
 $senha = $_POST['senha'] ?? '';
 $confirmarSenha = $_POST['confirmar_senha'] ?? '';
+$tipo = (($_POST['tipo'] ?? 'aluno') === 'professor') ? 'professor' : 'aluno';
+$codigoProfessor = trim($_POST['codigo_professor'] ?? '');
 
 if ($nome === '' || $email === '' || $senha === '' || $confirmarSenha === '') {
     $_SESSION['erro_cadastro'] = 'Preencha todos os campos.';
@@ -37,7 +40,15 @@ if ($senha !== $confirmarSenha) {
     exit;
 }
 
+if ($tipo === 'professor' && !hash_equals(CODIGO_PROFESSOR, $codigoProfessor)) {
+    $_SESSION['erro_cadastro'] = 'Código de professor inválido. Peça o código à coordenação da escola.';
+    header('Location: ?pagina=cadastro');
+    exit;
+}
+
 try {
+    garantir_coluna_tipo($conexao);
+
     $consulta = $conexao->prepare(
         'SELECT id_aluno FROM aluno WHERE email = :email LIMIT 1'
     );
@@ -52,14 +63,15 @@ try {
     $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
 
     $inserir = $conexao->prepare(
-        'INSERT INTO aluno (nome, email, senha)
-         VALUES (:nome, :email, :senha)'
+        'INSERT INTO aluno (nome, email, senha, tipo)
+         VALUES (:nome, :email, :senha, :tipo)'
     );
 
     $inserir->execute([
         'nome' => $nome,
         'email' => $email,
-        'senha' => $senhaHash
+        'senha' => $senhaHash,
+        'tipo' => $tipo
     ]);
 
     $_SESSION['sucesso_login'] = 'Conta criada! Agora entre com seu e-mail e senha.';

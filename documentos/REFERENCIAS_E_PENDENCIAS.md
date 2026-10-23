@@ -53,16 +53,13 @@ Marquei só o que conferi no código. **Prioridade: A** = pedido explícito do d
 
 | Prio | Item | Observação |
 |------|------|------------|
-| A | **Ranking** de alunos por pontuação | O documento pede a tabela; não encontrei no código |
 | A | **Medalhas / conquistas** | Pedido em "recompensas visuais" e no painel do aluno; hoje só há XP |
 | A | **Painel do aluno** com nível atual e medalhas | A home mostra XP e contagens; falta nível e medalhas |
 | A | **Feedback final com pontos de atenção e recomendação de estudo** | Está em "Sistema de Progresso"; hoje só mostra % por conteúdo |
 | A | Mínimo de **quatro jogos** no projeto em grupo | Aqui há dois (o documento diz que o grupo completa) |
-| B | **Perfil professor/admin e turmas** | Cadastro só cria `aluno`; não há turma nem conta de professor |
-| B | **Dicas progressivas** | Só aparece em Poções; falta nos demais jogos |
-| B | **Modo mais lento / sem pressa** (acessibilidade nos jogos) | O Desafio tem relógio fixo de 3 min; o documento prevê desacelerar |
+| B | **Turmas** (professor cria a turma e cadastra os alunos nela) | Já existe conta de professor e painel, mas o ranking e o painel mostram *todos* os alunos; falta separar por turma |
+| B | **Modo mais lento / sem pressa** (acessibilidade nos jogos) | O Desafio tem relógio fixo (agora 2 min); o documento prevê desacelerar |
 | B | Descrições alternativas e leitor de tela | Não achei `alt`, porque as imagens ainda são emojis; vale revisar quando houver arte |
-| B | Reação do Bicó em **todas** as telas de jogo | O documento quer o mascote também em Dupla e Guardião; hoje só nas Poções |
 | B | Trilha de aprendizado guiada na home | O documento descreve "hub com trilha"; a home é lista de jogos |
 | B | Banco NoSQL | O documento cita relacional **e** NoSQL; só há MySQL |
 | C | Hospital Numéria | O documento diz **só apresentar**, não implementar |
@@ -72,7 +69,6 @@ Marquei só o que conferi no código. **Prioridade: A** = pedido explícito do d
 1. `app/database/gerar_comparacao.php` e `gerar_identificacao.php` têm **0 bytes** (vazios). Se a banca abrir, convém preencher ou apagar.
 2. `app/models/` está vazia e `app/config/conexao.php` tem a porta `3307` fixa; considere um arquivo de configuração separado e fora do Git.
 3. As páginas aninham `<main>` dentro de `<main>` em alguns lugares e misturam muitos estilos inline (margens). Funciona, mas vale limpar.
-4. Vidas do Guardião usam emojis (❤️🟣). Troque por corações em pixel quando houver sprites.
 5. O `require` do `CadastroController.php` estava com a caixa errada (o arquivo é `cadastroController.php`); funciona no Windows e quebra em Linux. Já corrigi.
 
 ## 4. Sugestão de ordem de trabalho
@@ -80,3 +76,35 @@ Marquei só o que conferi no código. **Prioridade: A** = pedido explícito do d
 2. Tela final de partida com Bicó, pontos de atenção e recomendação de estudo.
 3. Perfil de professor e turmas.
 4. Bicó nas telas de Guardião e Dupla; modo "sem pressa".
+
+## 5. Atualização: segunda rodada de mudanças
+
+**Feito**
+- **Apresentação do Bicó na home**, com balão de fala e o que ele faz (dicas, explicações, "tudo bem errar").
+- **Dicas do Bicó em todos os jogos** (Desafio, Guardião, Dupla e Poções): botão "Pedir dica ao Bicó" mostra até 3 dicas, uma por vez, sem entregar a resposta. Elas são geradas a partir do enunciado (`app/helpers/dicas.php`), então não precisam de mudança no banco. O que antes se chamava "Dica do Bicó" depois do erro virou **"Bicó explica"**.
+- **Desafio**: tempo reduzido de 3 para **2 minutos** (uma única constante, `DESAFIO_DURACAO`, em `app/config/app.php`) e botão **Abandonar batalha**, com confirmação. A partida abandonada fica registrada como `abandonada`.
+- **Explicação após o erro** também no Desafio e no Guardião (antes só havia a mensagem curta).
+- **Dupla e Guardião sem emojis**: Bicó guerreiro (jogador logado / jogador 1), Onça (jogador 2) e Guardião ancestral, com as artes que você enviou, sobre o cenário do Vale Encantado.
+- **Guardião**: vidas em corações grandes, desempenho (desafio, acertos, erros, XP) em números enormes, e o personagem atingido treme (desligado para quem prefere menos movimento).
+- **Fundo da Batalha na Floresta** aplicado em todas as telas dessa área (batalha, desafio, guardião e dupla).
+- **Poções**: a receita aparece como folha de pergaminho (ingredientes, modo de preparo, frasco dividido e materiais embaixo), gerada a partir da própria pergunta.
+
+**Ainda vale conferir**
+- Os arquivos PHP não foram executados no ambiente em que foram escritos (sem PHP disponível). A lógica foi revisada e o visual testado em HTML equivalente. Teste cada jogo no Laragon.
+- As dicas das Poções cobrem as duas mecânicas atuais (identificação e comparação). Se criar outras mecânicas, inclua o caso em `dicas_bico()`.
+
+## 6. Atualização: professor/aluno, ranking e novo cenário
+
+**Feito**
+- **Cenário novo da arena** (Bicó x Guardião e Bicó x Onça): uma clareira encantada em pixel art, desenhada para o projeto. Para trocar por outra arte, basta substituir o arquivo `public/assets/img/arena-clareira.png` (proporção 16:9 funciona melhor). O fundo geral da Batalha na Floresta continua sendo o Vale Encantado.
+- **Login diferenciado**: na tela de entrada o usuário escolhe **Aluno** ou **Professor(a)**; se a conta não for do tipo escolhido, aparece uma mensagem explicando. O professor entra direto no painel dele; o aluno, na home.
+- **Cadastro com tipo de conta**: "Eu sou Aluno / Professor(a)". Quem escolhe professor precisa digitar o **código de professor**, definido em `CODIGO_PROFESSOR` (`app/config/app.php`, valor atual `NUMERIA-PROF`). **Troque esse código antes de apresentar ou publicar**, senão qualquer aluno que o descubra vira professor.
+- **Banco**: a tabela `aluno` ganha a coluna `tipo` (`aluno` ou `professor`). O script `app/database/migracao_tipo_usuario.sql` faz isso; se você esquecer de rodar, o sistema cria a coluna sozinho no primeiro cadastro ou login (usa o usuário `root` do Laragon). Contas antigas viram `aluno`.
+- **Ranking dos alunos** (`?pagina=ranking`, para quem está logado): pódio com medalhas em pixel, tabela completa (posição, XP, partidas, aproveitamento), sua linha destacada e uma frase motivacional do Bicó ("faltam só X XP para alcançar..."). Empates dividem a posição. Professores não entram no ranking.
+- **Painel do professor** (`?pagina=professor`, só para professores): resumo (alunos, XP médio, aproveitamento, partidas), "pontos de atenção" com os alunos abaixo de 50% de acertos e tabela com XP, acertos, erros e situação de cada aluno.
+- Menu novo: **Ranking** para todos, **Painel do Professor** para professores (com selo "Professor" ao lado do nome).
+
+**Pontos de cuidado**
+- O ranking mostra o nome como foi cadastrado. Como são alunos do Fundamental II, vale orientar a usar nome e sobrenome ou apelido combinado com a escola.
+- Ainda não há separação por turma: o ranking e o painel mostram todos os alunos cadastrados.
+- Para criar o primeiro professor: abra "Criar conta", escolha Professor(a) e digite o código.

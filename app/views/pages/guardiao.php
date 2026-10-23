@@ -10,6 +10,9 @@ if (empty($_SESSION['aluno_id'])) {
 $idAluno = (int) $_SESSION['aluno_id'];
 $mensagem = $_SESSION['guardiao_mensagem'] ?? '';
 unset($_SESSION['guardiao_mensagem']);
+$mensagemTipo = $_SESSION['guardiao_tipo'] ?? '';
+$explicacaoErro = $_SESSION['guardiao_explicacao'] ?? '';
+unset($_SESSION['guardiao_tipo'], $_SESSION['guardiao_explicacao']);
 $resultado = null;
 $partidaAtiva = false;
 $partidaSemEstado = false;
@@ -755,7 +758,21 @@ if ($partidaAtiva) {
                     $conexao->commit();
                     $mensagem = $acertouResposta
                         ? 'Resposta correta! O Guardião foi atingido e você ganhou ' . $xpGanho . ' XP!'
-                        : 'Resposta incorreta! Você perdeu uma vida.';
+                        : 'Ops, talvez não seja essa a resposta correta… Você perdeu uma vida, mas tudo bem errar!';
+
+                    $_SESSION['guardiao_tipo'] = $acertouResposta ? 'acerto' : 'erro';
+                    unset($_SESSION['guardiao_explicacao']);
+
+                    // Explicação didática e imediata, só quando erra.
+                    if (!$acertouResposta) {
+                        $consultaExplicacao = $conexao->prepare(
+                            'SELECT explicacao_curta
+                             FROM questao
+                             WHERE id_questao = :questao'
+                        );
+                        $consultaExplicacao->execute(['questao' => $idQuestaoEnviada]);
+                        $_SESSION['guardiao_explicacao'] = (string) $consultaExplicacao->fetchColumn();
+                    }
                 }
             }
         } catch (Throwable $e) {
@@ -928,9 +945,20 @@ if ($partidaAtiva) {
         <h2>Contra o Guardião</h2>
 
         <?php if ($mensagem !== ''): ?>
-            <p role="status">
-                <?= htmlspecialchars($mensagem, ENT_QUOTES, 'UTF-8') ?>
-            </p>
+            <div role="status" class="feedback-msg <?= ($mensagemTipo === 'acerto') ? 'feedback-sucesso' : 'feedback-erro' ?>">
+                <div class="bico-feedback">
+                    <span class="bico-icone" aria-hidden="true"></span>
+                    <div>
+                        <p><strong><?= htmlspecialchars($mensagem, ENT_QUOTES, 'UTF-8') ?></strong></p>
+                        <?php if (!empty($explicacaoErro)): ?>
+                            <p class="explicacao">
+                                <strong>Bicó explica:</strong>
+                                <?= htmlspecialchars($explicacaoErro, ENT_QUOTES, 'UTF-8') ?>
+                            </p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
         <?php endif; ?>
 
         <?php if ($partidaSemEstado): ?>
@@ -993,23 +1021,63 @@ if ($partidaAtiva) {
 
         <?php else: ?>
 
-            <div class="painel-status" style="margin-bottom: 20px;">
-                <p>
-                    Vidas do Jogador: <strong><?= str_repeat('❤️ ', max(0, $vidasJogador)) ?: '💔 Sem escudos' ?></strong> (<?= $vidasJogador ?>/3) |
-                    Vidas do Guardião: <strong><?= str_repeat('🟣 ', max(0, $vidasGuardiao)) ?: '💥 Atordoado' ?></strong> (<?= $vidasGuardiao ?>/3)
-                </p>
-                <p>
-                    Desafio: <strong><?= min(10, $totalQuestoes + 1) ?></strong> de 10 |
-                    Acertos: <strong><?= $acertos ?></strong> |
-                    XP: <strong><?= $xpTotal ?> XP</strong>
-                </p>
-                <progress value="<?= $totalQuestoes ?>" max="10" style="width: 100%;" aria-label="Progresso da batalha"></progress>
-            </div>
+            <?php
+            $nomeJogador = $_SESSION['aluno_nome'] ?? 'Jogador';
+            $hudDesafio = min(10, $totalQuestoes + 1);
+            ?>
+            <section class="arena" aria-label="Placar da batalha">
+                <div class="arena-lutadores">
+                    <?php
+                    $lt_tipo = 'bico';
+                    $lt_nome = $nomeJogador;
+                    $lt_papel = 'Bicó guerreiro';
+                    $lt_vidas = $vidasJogador;
+                    $lt_max = 3;
+                    $lt_classe = 'lutador-jogador' . ($mensagemTipo === 'erro' ? ' atingido' : '');
+                    $lt_vez = false;
+                    include __DIR__ . '/../partials/lutador.php';
+                    ?>
+
+                    <div class="arena-vs" aria-hidden="true">VS</div>
+
+                    <?php
+                    $lt_tipo = 'guardiao';
+                    $lt_nome = 'Guardião';
+                    $lt_papel = 'da Floresta';
+                    $lt_vidas = $vidasGuardiao;
+                    $lt_max = 3;
+                    $lt_classe = 'lutador-guardiao' . ($mensagemTipo === 'acerto' ? ' atingido' : '');
+                    include __DIR__ . '/../partials/lutador.php';
+                    ?>
+                </div>
+
+                <div class="desempenho" role="group" aria-label="Seu desempenho nesta batalha">
+                    <div class="medidor">
+                        <span class="medidor-rotulo">Desafio</span>
+                        <strong class="medidor-valor"><?= $hudDesafio ?><small>/10</small></strong>
+                    </div>
+                    <div class="medidor medidor-acerto">
+                        <span class="medidor-rotulo">Acertos</span>
+                        <strong class="medidor-valor"><?= $acertos ?></strong>
+                    </div>
+                    <div class="medidor medidor-erro">
+                        <span class="medidor-rotulo">Erros</span>
+                        <strong class="medidor-valor"><?= $erros ?></strong>
+                    </div>
+                    <div class="medidor medidor-xp">
+                        <span class="medidor-rotulo">XP</span>
+                        <strong class="medidor-valor"><?= $xpTotal ?></strong>
+                    </div>
+                </div>
+
+                <progress value="<?= $totalQuestoes ?>" max="10" aria-label="Progresso da batalha"></progress>
+            </section>
 
             <?php if ($questao): ?>
                 <article class="card">
                     <h3><?= htmlspecialchars($questao['enunciado'], ENT_QUOTES, 'UTF-8') ?></h3>
 
+                    <?php include __DIR__ . '/../partials/dica_bico.php'; ?>
                     <?php if ($alternativas): ?>
                         <form method="POST">
                             <input type="hidden" name="id_questao" value="<?= (int) $questao['id_questao'] ?>">
@@ -1041,7 +1109,7 @@ if ($partidaAtiva) {
         <?php endif; ?>
 
         <?php if ($partidaAtiva && !$fimDeJogo): ?>
-            <p><a href="?pagina=abandonar_guardiao&id_partida=<?= $idPartida ?>" class="btn btn-secondary">Voltar aos modos (Abandonar batalha)</a></p>
+            <p><a href="?pagina=abandonar_guardiao&id_partida=<?= $idPartida ?>" class="btn btn-secondary" data-confirmar="Quer mesmo abandonar a batalha? Seu progresso desta partida não será continuado.">Abandonar batalha</a></p>
         <?php else: ?>
             <p><a href="?pagina=batalha">Voltar à Batalha na Floresta</a></p>
         <?php endif; ?>

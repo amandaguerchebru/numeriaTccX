@@ -50,7 +50,7 @@ if (
     $consultaPartida->execute([
         'jogo' => 1,
         'modo' => (int) $idModo,
-        'tempo' => 180,
+        'tempo' => DESAFIO_DURACAO,
         'status' => 'em_andamento'
     ]);
 
@@ -100,10 +100,12 @@ $_SESSION['desafio_erros'] = (int) ($_SESSION['desafio_erros'] ?? 0);
 
 $tempoRestante = max(
     0,
-    180 - (time() - $_SESSION['desafio_inicio'])
+    DESAFIO_DURACAO - (time() - $_SESSION['desafio_inicio'])
 );
 
 $mensagem = '';
+$mensagemTipo = '';
+$explicacaoErro = '';
 $questao = null;
 $alternativas = [];
 
@@ -284,6 +286,7 @@ if (
                     $_SESSION['desafio_xp'] += $xpQuestao;
                     $_SESSION['desafio_acertos']++;
 
+                    $mensagemTipo = 'acerto';
                     $mensagem = 'Resposta correta! Você ganhou '
                         . $xpQuestao . ' XP!';
 
@@ -300,7 +303,17 @@ if (
 
                     $_SESSION['desafio_erros']++;
 
-                    $mensagem = 'Não foi dessa vez! Continue tentando.';
+                    $mensagemTipo = 'erro';
+                    $mensagem = 'Ops, talvez não seja essa a resposta correta… Tudo bem errar!';
+
+                    // Explicação didática e imediata da resolução.
+                    $consultaExplicacao = $conexao->prepare(
+                        'SELECT explicacao_curta
+                         FROM questao
+                         WHERE id_questao = :questao'
+                    );
+                    $consultaExplicacao->execute(['questao' => $idQuestao]);
+                    $explicacaoErro = (string) $consultaExplicacao->fetchColumn();
                 }
 
             } else {
@@ -312,7 +325,7 @@ if (
     // Recalcula o tempo sem reiniciar a partida.
     $tempoRestante = max(
         0,
-        180 - (time() - $_SESSION['desafio_inicio'])
+        DESAFIO_DURACAO - (time() - $_SESSION['desafio_inicio'])
     );
 }
 
@@ -395,13 +408,20 @@ if ($tempoRestante > 0) {
 
         <!-- FEEDBACK DA RESPOSTA -->
         <?php if ($mensagem !== ''): ?>
-            <p role="status">
-                <?= htmlspecialchars(
-                    $mensagem,
-                    ENT_QUOTES,
-                    'UTF-8'
-                ) ?>
-            </p>
+            <div role="status" class="feedback-msg <?= ($mensagemTipo === 'acerto') ? 'feedback-sucesso' : 'feedback-erro' ?>">
+                <div class="bico-feedback">
+                    <span class="bico-icone" aria-hidden="true"></span>
+                    <div>
+                        <p><strong><?= htmlspecialchars($mensagem, ENT_QUOTES, 'UTF-8') ?></strong></p>
+                        <?php if (!empty($explicacaoErro)): ?>
+                            <p class="explicacao">
+                                <strong>Bicó explica:</strong>
+                                <?= htmlspecialchars($explicacaoErro, ENT_QUOTES, 'UTF-8') ?>
+                            </p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
         <?php endif; ?>
 
 
@@ -416,7 +436,7 @@ if ($tempoRestante > 0) {
             style="margin-top: 24px;">
 
             <h3>⏱️ Desafio Encerrado!</h3>
-            <p>O tempo de 3 minutos terminou. Veja seu desempenho nesta aventura contra o relógio:</p>
+            <p>O tempo de <?= (int) (DESAFIO_DURACAO / 60) ?> minutos terminou. Veja seu desempenho nesta aventura contra o relógio:</p>
 
             <?php
             $acertosDesafio = (int) ($_SESSION['desafio_acertos'] ?? 0);
@@ -480,6 +500,7 @@ if ($tempoRestante > 0) {
                         ) ?>
                     </h3>
 
+                    <?php include __DIR__ . '/../partials/dica_bico.php'; ?>
                     <?php if (count($alternativas) > 0): ?>
 
                         <form
@@ -535,6 +556,14 @@ if ($tempoRestante > 0) {
                 </p>
 
             <?php endif; ?>
+
+            <p class="acoes-jogo">
+                <a href="?pagina=abandonar_desafio"
+                   class="btn btn-secondary"
+                   data-confirmar="Quer mesmo abandonar a batalha? Seu progresso desta partida não será continuado.">
+                    Abandonar batalha
+                </a>
+            </p>
 
         </div>
 

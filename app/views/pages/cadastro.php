@@ -16,6 +16,39 @@ unset($_SESSION['erro_cadastro']);
         <?php endif; ?>
 
         <form action="<?= htmlspecialchars(app_url('?pagina=cadastro')) ?>" method="POST">
+            <fieldset class="escolha-perfil">
+                <legend>Eu sou</legend>
+                <label>
+                    <input type="radio" name="tipo" value="aluno" checked>
+                    <span>
+                        <strong>Aluno</strong>
+                        <small>Quero jogar e aprender</small>
+                    </span>
+                </label>
+                <label>
+                    <input type="radio" name="tipo" value="professor">
+                    <span>
+                        <strong>Professor(a)</strong>
+                        <small>Quero acompanhar meus alunos</small>
+                    </span>
+                </label>
+            </fieldset>
+
+            <div class="campo-professor" data-campo-professor>
+                <label for="codigo_professor">Código de professor</label>
+                <input
+                    type="text"
+                    id="codigo_professor"
+                    name="codigo_professor"
+                    maxlength="40"
+                    autocomplete="off"
+                    aria-describedby="ajuda-codigo"
+                >
+                <p class="ajuda-campo" id="ajuda-codigo">
+                    Só para professores: peça o código à coordenação da escola.
+                </p>
+            </div>
+
             <label for="nome">Nome</label>
             <input
                 type="text"

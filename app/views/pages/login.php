@@ -44,6 +44,24 @@ unset($_SESSION['erro_login']);
                     ) ?>"
             method="POST">
 
+            <fieldset class="escolha-perfil">
+                <legend>Entrar como</legend>
+                <label>
+                    <input type="radio" name="perfil" value="aluno" checked>
+                    <span>
+                        <strong>Aluno</strong>
+                        <small>Jogar, ganhar XP e ver o ranking</small>
+                    </span>
+                </label>
+                <label>
+                    <input type="radio" name="perfil" value="professor">
+                    <span>
+                        <strong>Professor(a)</strong>
+                        <small>Acompanhar o desempenho dos alunos</small>
+                    </span>
+                </label>
+            </fieldset>
+
             <label for="email">E-mail</label>
             <input
                 type="email"

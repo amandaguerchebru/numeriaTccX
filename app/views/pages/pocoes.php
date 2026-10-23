@@ -338,7 +338,7 @@ if ($partidaAtiva) {
                         <p><strong><?= htmlspecialchars($mensagem, ENT_QUOTES, 'UTF-8') ?></strong></p>
                         <?php if ($explicacao !== ''): ?>
                             <p class="explicacao">
-                                <strong>Dica do Bicó:</strong> <?= htmlspecialchars($explicacao, ENT_QUOTES, 'UTF-8') ?>
+                                <strong>Bicó explica:</strong> <?= htmlspecialchars($explicacao, ENT_QUOTES, 'UTF-8') ?>
                             </p>
                         <?php endif; ?>
                     </div>
@@ -437,8 +437,12 @@ if ($partidaAtiva) {
             <?php if ($questao): ?>
                 <article class="card">
                     <span class="badge">Receita Mágica #<?= $totalQuestoes + 1 ?></span>
-                    <h3 style="margin-top: 12px;"><?= htmlspecialchars($questao['enunciado'], ENT_QUOTES, 'UTF-8') ?></h3>
+                    <?php include __DIR__ . '/../partials/receita_pocao.php'; ?>
 
+                    <p class="desafio-rotulo">Desafio do Bicó</p>
+                    <h3><?= htmlspecialchars($questao['enunciado'], ENT_QUOTES, 'UTF-8') ?></h3>
+
+                    <?php include __DIR__ . '/../partials/dica_bico.php'; ?>
                     <?php if ($alternativas): ?>
                         <form method="POST" style="margin-top: 16px;">
                             <input type="hidden" name="id_questao" value="<?= (int) $questao['id_questao'] ?>">
@@ -472,7 +476,7 @@ if ($partidaAtiva) {
             <?php endif; ?>
 
             <p style="margin-top: 24px;">
-                <a href="?pagina=abandonar_pocoes" class="btn btn-secondary">
+                <a href="?pagina=abandonar_pocoes" class="btn btn-secondary" data-confirmar="Quer mesmo guardar os frascos e sair do jogo?">
                     Guardar frascos e voltar aos jogos
                 </a>
             </p>

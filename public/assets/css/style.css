@@ -833,3 +833,905 @@ footer {
     header, footer, .acess-fonte { display: none; }
     .card, .hero { box-shadow: none; border: 2px solid #000; }
 }
+
+
+/* ==========================================================================
+   PERSONAGENS EM PIXEL (caçador, monstrinho, Bicó)
+   ========================================================================== */
+.sprite-bico,
+.sprite-guardiao,
+.sprite-onca {
+    background-repeat: no-repeat;
+    background-position: bottom center;
+    background-size: contain;
+}
+/* Bicó olha para a direita; guardião e onça olham para a esquerda (lado do Bicó) */
+.sprite-bico     { background-image: url("../img/bico-guerreiro.png"); }
+.sprite-guardiao { background-image: url("../img/guardiao-esq.png"); }
+.sprite-onca     { background-image: url("../img/onca-esq.png"); }
+
+.mini-sprite {
+    display: inline-block;
+    width: 34px;
+    height: 34px;
+    vertical-align: middle;
+    flex: none;
+}
+.mini-sprite.grande {
+    width: 110px;
+    height: 110px;
+}
+.mini-sprite.grande.sprite-onca {
+    width: 150px;
+}
+
+.escolha-lutadores {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 22px;
+    margin: 6px 0 14px;
+}
+
+/* ==========================================================================
+   ARENA (Guardião e Dupla): cenário de jogo com vidas e desempenho grandes
+   ========================================================================== */
+.arena {
+    margin: 6px 4px 28px;
+    background: var(--branco);
+    box-shadow: var(--pixel), 8px 8px 0 4px rgba(29, 35, 64, 0.25);
+}
+
+/* cenário da arena: clareira encantada (arquivo: img/arena-clareira.png, é só trocar para mudar o fundo) */
+.arena-lutadores {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: end;
+    gap: 10px;
+    min-height: 420px;
+    padding: 22px 22px 22px;
+    background: #8ec8f5 url("../img/arena-clareira.png") center bottom / cover no-repeat;
+    image-rendering: pixelated;
+    border-bottom: 3px solid var(--tinta);
+    overflow: hidden;
+}
+
+.lutador {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+}
+
+/* tudo que é informação fica em cima; o personagem pisa no chão */
+.lutador-balao   { order: 0; }
+.lutador-nome    { order: 1; }
+.vidas           { order: 2; }
+.vidas-texto     { order: 3; }
+.mini-placar     { order: 4; }
+.lutador-sprite  { order: 5; }
+
+.lutador-sprite {
+    width: 190px;
+    height: 200px;
+    margin-bottom: 4px;
+    filter: drop-shadow(0 6px 0 rgba(29, 35, 64, 0.35));
+}
+.lutador-sprite.sprite-guardiao { width: 210px; height: 210px; }
+.lutador-sprite.sprite-onca     { width: 270px; height: 190px; }
+
+.lutador-nome {
+    padding: 6px 14px;
+    font-weight: 700;
+    font-size: 1.05rem;
+    line-height: 1.25;
+    color: var(--tinta);
+    background: var(--branco);
+    border: 3px solid var(--tinta);
+    box-shadow: 3px 3px 0 var(--tinta);
+}
+.lutador-nome small {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--tinta-suave);
+}
+
+/* corações grandes e fáceis de contar */
+.vidas {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--branco);
+    border: 3px solid var(--tinta);
+    box-shadow: 3px 3px 0 var(--tinta);
+}
+.vida {
+    display: block;
+    width: 46px;
+    height: 42px;
+    background: url("../img/coracao-cheio.svg") center / contain no-repeat;
+    image-rendering: pixelated;
+}
+.vida.vazia {
+    background-image: url("../img/coracao-vazio.svg");
+}
+
+.vidas-texto {
+    padding: 2px 10px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    background: var(--amarelo-claro);
+    border: 2px solid var(--tinta);
+}
+
+.arena-vs {
+    align-self: center;
+    margin-bottom: 70px;
+    font-family: var(--fonte-pixel);
+    font-size: 1.8rem;
+    color: var(--branco);
+    text-shadow: 3px 3px 0 var(--tinta), -1px -1px 0 var(--tinta), 1px -1px 0 var(--tinta), -1px 1px 0 var(--tinta);
+}
+
+/* quem está na vez */
+.lutador-balao {
+    padding: 4px 12px;
+    font-family: var(--fonte-pixel);
+    font-size: 0.62rem;
+    line-height: 1.8;
+    color: var(--tinta);
+    background: var(--amarelo);
+    border: 3px solid var(--tinta);
+    text-transform: uppercase;
+}
+.lutador-vez .lutador-sprite {
+    animation: pulinho 0.8s steps(2, jump-none) infinite;
+}
+.lutador-vez .lutador-nome {
+    background: var(--amarelo-claro);
+}
+
+/* quem levou o golpe treme */
+.lutador.atingido .lutador-sprite {
+    animation: tremer 0.5s steps(5, jump-none) 1;
+}
+.lutador.atingido .vidas {
+    animation: tremer 0.5s steps(5, jump-none) 1;
+}
+
+@keyframes pulinho {
+    0%   { transform: translateY(0); }
+    100% { transform: translateY(-8px); }
+}
+@keyframes tremer {
+    0%   { transform: translateX(0); }
+    20%  { transform: translateX(-8px); }
+    40%  { transform: translateX(8px); }
+    60%  { transform: translateX(-6px); }
+    80%  { transform: translateX(6px); }
+    100% { transform: translateX(0); }
+}
+
+/* placar da dupla */
+.mini-placar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px 12px;
+    padding: 6px 12px;
+    font-size: 0.95rem;
+    background: var(--branco);
+    border: 2px solid var(--tinta);
+}
+.mini-placar strong {
+    font-family: var(--fonte-pixel);
+    font-size: 1.05rem;
+    color: var(--roxo);
+}
+
+/* desempenho do jogador: números enormes */
+.desempenho {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    padding: 20px 22px 8px;
+}
+
+.medidor {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 12px 8px 10px;
+    text-align: center;
+    background: var(--papel);
+    border: 3px solid var(--tinta);
+    box-shadow: 4px 4px 0 var(--tinta);
+}
+.medidor-rotulo {
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--tinta-suave);
+}
+.medidor-valor {
+    font-family: var(--fonte-pixel);
+    font-size: 2.1rem;
+    line-height: 1.3;
+    color: var(--tinta);
+}
+.medidor-valor small {
+    font-size: 0.95rem;
+    color: var(--tinta-suave);
+}
+.medidor-acerto .medidor-valor { color: var(--cor-acerto); }
+.medidor-erro .medidor-valor   { color: var(--cor-erro); }
+.medidor-xp .medidor-valor     { color: var(--cor-ouro-escuro); }
+
+.arena progress {
+    width: calc(100% - 44px);
+    margin: 14px 22px 22px;
+}
+
+/* ==========================================================================
+   DICAS DO BICÓ
+   ========================================================================== */
+.dica-bico {
+    margin: 16px 0 10px;
+    padding: 14px 16px;
+    background: var(--roxo-claro);
+    border: 3px dashed var(--roxo);
+}
+
+.dica-bico-topo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+}
+
+.bico-mini {
+    flex: none;
+    width: 46px;
+    height: 50px;
+    background: url("../img/bico-neutro.svg") center / contain no-repeat;
+    image-rendering: pixelated;
+}
+
+.dica-bico-fala {
+    flex: 1 1 200px;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.3;
+}
+.dica-bico-fala span {
+    font-size: 0.9rem;
+    color: var(--tinta-suave);
+}
+
+.dica-btn {
+    min-height: 46px;
+    padding: 8px 18px;
+    font-family: var(--fonte-texto);
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--branco);
+    background: var(--roxo);
+    border: 0;
+    cursor: pointer;
+    box-shadow:
+        var(--pixel),
+        inset -4px -4px 0 rgba(0, 0, 0, 0.25),
+        inset 4px 4px 0 rgba(255, 255, 255, 0.25),
+        5px 5px 0 4px var(--tinta);
+    margin: 4px 10px 8px 4px;
+}
+.dica-btn:hover:not(:disabled) {
+    background: var(--amarelo);
+    color: var(--tinta);
+}
+.dica-btn:active:not(:disabled) {
+    transform: translate(4px, 4px);
+    box-shadow: var(--pixel), inset 4px 4px 0 rgba(0, 0, 0, 0.25), 1px 1px 0 4px var(--tinta);
+}
+.dica-btn:disabled {
+    background: var(--papel-escuro);
+    color: var(--tinta-suave);
+    cursor: default;
+    box-shadow: var(--pixel);
+    margin-right: 8px;
+}
+
+.dica-lista {
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+}
+.dica-lista li {
+    margin: 8px 0 0;
+    padding: 10px 14px;
+    background: var(--branco);
+    border: 2px solid var(--tinta);
+    border-left: 8px solid var(--laranja);
+}
+.dica-num {
+    display: inline-block;
+    margin-right: 8px;
+    padding: 0 8px;
+    font-family: var(--fonte-pixel);
+    font-size: 0.6rem;
+    line-height: 2;
+    text-transform: uppercase;
+    background: var(--amarelo);
+    border: 2px solid var(--tinta);
+}
+
+.acoes-jogo {
+    margin-top: 22px;
+}
+
+/* ==========================================================================
+   RECEITA DA POÇÃO (folha de pergaminho)
+   ========================================================================== */
+.receita {
+    --marrom: #5a3b1a;
+    position: relative;
+    margin: 20px 4px 26px;
+    padding: 46px 26px 20px;
+    font-family: Georgia, "Times New Roman", serif;
+    color: #3b2610;
+    background-color: #f7e8c4;
+    /* linhas de caderno envelhecido */
+    background-image: repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent 31px,
+        rgba(138, 90, 43, 0.09) 31px,
+        rgba(138, 90, 43, 0.09) 32px);
+    box-shadow:
+        0 -4px 0 0 var(--marrom),
+        0 4px 0 0 var(--marrom),
+        -4px 0 0 0 var(--marrom),
+        4px 0 0 0 var(--marrom),
+        inset 0 0 0 6px #ecd7a6,
+        8px 8px 0 4px rgba(29, 35, 64, 0.2);
+}
+
+/* fita vermelha com o nome da poção */
+.receita-fita {
+    position: absolute;
+    top: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 90%;
+    padding: 8px 22px;
+    font-family: var(--fonte-pixel);
+    font-size: 0.8rem;
+    line-height: 1.6;
+    text-align: center;
+    color: var(--branco);
+    background: #c9342a;
+    border: 3px solid var(--tinta);
+    box-shadow: 4px 4px 0 var(--tinta);
+}
+
+.receita-sub {
+    margin: 0 0 14px;
+    font-style: italic;
+    text-align: center;
+    color: #7a5a30;
+}
+
+.receita-corpo {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 30px;
+}
+
+.receita h4 {
+    margin: 0 0 8px;
+    padding-bottom: 4px;
+    font-size: 1.1rem;
+    color: #7a2e12;
+    border-bottom: 2px dashed #a9743a;
+}
+
+.receita-lista,
+.receita-passos {
+    margin: 0;
+    padding: 0;
+    font-size: 1.05rem;
+    line-height: 1.7;
+}
+.receita-lista { list-style: none; }
+.receita-lista li { margin: 6px 0; }
+.receita-passos { padding-left: 22px; }
+.receita-passos li { margin: 6px 0; padding-left: 4px; }
+
+.receita .qtd {
+    display: inline-block;
+    min-width: 34px;
+    margin-right: 6px;
+    padding: 0 8px;
+    font-family: var(--fonte-texto);
+    font-weight: 700;
+    text-align: center;
+    color: var(--tinta);
+    background: var(--amarelo);
+    border: 2px solid var(--marrom);
+}
+
+/* fração empilhada, como no caderno */
+.frac {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    vertical-align: middle;
+    line-height: 1.05;
+    font-weight: 700;
+}
+.frac-n { padding: 0 4px; border-bottom: 2px solid currentColor; }
+.frac-d { padding: 0 4px; }
+
+/* frasco dividido em partes iguais */
+.frasco {
+    display: flex;
+    gap: 0;
+    max-width: 520px;
+    height: 40px;
+    margin: 18px auto 6px;
+    border: 3px solid var(--tinta);
+    background: #fff;
+    box-shadow: 4px 4px 0 var(--tinta);
+}
+.frasco span {
+    flex: 1;
+    border-right: 2px solid var(--tinta);
+    background: #fffdf4;
+}
+.frasco span:last-child { border-right: 0; }
+.frasco span.cheio {
+    background:
+        linear-gradient(rgba(255,255,255,.35) 0 25%, transparent 25%),
+        var(--roxo);
+}
+
+.receita-dupla .receita-bloco {
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.45);
+    border: 2px dashed #a9743a;
+}
+.receita-nota {
+    margin: 12px 0 0;
+    font-style: italic;
+    text-align: center;
+}
+
+/* materiais necessários, embaixo da folha */
+.receita-materiais {
+    margin-top: 18px;
+    padding-top: 10px;
+    border-top: 3px double #a9743a;
+}
+.receita-materiais h4 {
+    border-bottom: 0;
+    margin-bottom: 6px;
+}
+.receita-materiais ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.receita-materiais li {
+    padding: 3px 12px;
+    font-size: 0.95rem;
+    background: #fffdf4;
+    border: 2px solid var(--marrom);
+}
+
+.desafio-rotulo {
+    margin: 14px 0 4px;
+    font-family: var(--fonte-pixel);
+    font-size: 0.66rem;
+    line-height: 1.8;
+    text-transform: uppercase;
+    color: var(--roxo);
+}
+
+/* ==========================================================================
+   APRESENTAÇÃO DO BICÓ (home)
+   ========================================================================== */
+.apresentacao-bico {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 14px 34px;
+    align-items: center;
+    margin: 4px 4px 36px;
+    padding: 28px 30px;
+    background: var(--roxo-claro);
+    box-shadow: var(--pixel), 10px 10px 0 4px rgba(106, 63, 181, 0.25);
+}
+
+.hero:has(+ .apresentacao-bico)::after {
+    display: none;
+}
+
+.bico-retrato {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+}
+.bico-grande {
+    display: block;
+    width: 190px;
+    height: 209px;
+    background: url("../img/bico-feliz.svg") center / contain no-repeat;
+    image-rendering: pixelated;
+    animation: pulinho 1s steps(2, jump-none) infinite alternate;
+}
+.bico-plaquinha {
+    padding: 4px 22px;
+    font-family: var(--fonte-pixel);
+    font-size: 0.9rem;
+    line-height: 1.8;
+    color: var(--amarelo);
+    background: var(--tinta);
+    box-shadow: 4px 4px 0 var(--roxo);
+}
+
+.bico-texto h2 {
+    margin-top: 8px;
+}
+
+/* balão de fala */
+.bico-balao {
+    position: relative;
+    margin: 6px 0 20px;
+    padding: 14px 18px;
+    font-size: 1.05rem;
+    background: var(--branco);
+    border: 3px solid var(--tinta);
+    box-shadow: 4px 4px 0 var(--tinta);
+}
+.bico-balao::before {
+    content: "";
+    position: absolute;
+    left: -11px;
+    top: 22px;
+    width: 16px;
+    height: 16px;
+    background: var(--branco);
+    border-left: 3px solid var(--tinta);
+    border-bottom: 3px solid var(--tinta);
+    transform: rotate(45deg);
+}
+
+.bico-poderes {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.bico-poderes li {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px;
+    background: var(--branco);
+    border: 3px solid var(--tinta);
+    border-top: 10px solid var(--laranja);
+    box-shadow: 4px 4px 0 var(--tinta);
+}
+.bico-poderes li:nth-child(2) { border-top-color: var(--azul); }
+.bico-poderes li:nth-child(3) { border-top-color: var(--roxo); }
+.bico-poderes strong { font-size: 1.02rem; }
+.bico-poderes span { font-size: 0.93rem; color: var(--tinta-suave); }
+
+/* ==========================================================================
+   Ajustes de tela pequena para os componentes novos
+   ========================================================================== */
+@media (max-width: 760px) {
+    .arena-lutadores {
+        grid-template-columns: 1fr 1fr;
+        padding: 20px 12px 40px;
+    }
+    .arena-vs {
+        display: none;
+    }
+    .arena-lutadores { min-height: 300px; }
+    .lutador-sprite { width: 110px; height: 120px; }
+    .lutador-sprite.sprite-guardiao { width: 120px; height: 124px; }
+    .lutador-sprite.sprite-onca { width: 140px; height: 104px; }
+    .vidas { padding: 4px 8px; }
+    .lutador-nome { font-size: 0.95rem; padding: 4px 10px; }
+    .vida { width: 36px; height: 33px; }
+    .vidas { gap: 4px; }
+
+    .desempenho {
+        grid-template-columns: repeat(2, 1fr);
+        padding: 16px 14px 6px;
+    }
+    .medidor-valor { font-size: 1.8rem; }
+    .arena progress {
+        width: calc(100% - 28px);
+        margin: 12px 14px 18px;
+    }
+
+    .receita { padding: 44px 16px 16px; }
+    .receita-corpo { grid-template-columns: 1fr; }
+    .receita-fita { font-size: 0.66rem; padding: 6px 12px; }
+
+    .apresentacao-bico {
+        grid-template-columns: 1fr;
+        padding: 22px 16px;
+    }
+    .bico-grande { width: 140px; height: 154px; }
+    .bico-poderes { grid-template-columns: 1fr; }
+    .bico-balao::before { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lutador-vez .lutador-sprite,
+    .lutador.atingido .lutador-sprite,
+    .lutador.atingido .vidas,
+    .bico-grande {
+        animation: none;
+    }
+}
+
+
+/* ==========================================================================
+   FUNDO DA BATALHA NA FLORESTA (batalha, desafio, guardião e dupla)
+   ========================================================================== */
+body.tema-batalha {
+    background-color: #2a6b3c;
+    background-image: url("../img/fundo-batalha.jpg");
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+/* a folha do jogo "flutua" sobre a paisagem, mas continua bem legível */
+.tema-batalha .hero {
+    background: rgba(255, 255, 255, 0.94);
+}
+.tema-batalha .hero::after {
+    display: none;
+}
+@media (max-width: 760px) {
+    body.tema-batalha { background-attachment: scroll; }
+}
+
+/* as personagens são arte suave: não herdam o "pixelated" do cenário */
+.lutador-sprite { image-rendering: auto; }
+
+
+/* ==========================================================================
+   PERFIL (aluno / professor), RANKING E PAINEL DO PROFESSOR
+   ========================================================================== */
+.escolha-perfil {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 14px;
+    margin: 14px 0 8px;
+    padding: 0;
+    border: 0;
+}
+.escolha-perfil legend {
+    margin-bottom: 4px;
+    padding: 0;
+    font-weight: 700;
+}
+.escolha-perfil legend {
+    grid-column: 1 / -1;
+}
+.card form .escolha-perfil label:has(input[type="radio"]) {
+    margin: 6px 4px;
+    align-items: flex-start;
+}
+.escolha-perfil label span {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.3;
+}
+.escolha-perfil label small {
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--tinta-suave);
+}
+
+.campo-professor {
+    margin: 10px 0 8px;
+    padding: 4px 16px 8px;
+    background: var(--roxo-claro);
+    border: 3px dashed var(--roxo);
+}
+
+.ajuda-campo {
+    margin: 6px 0 12px;
+    font-size: 0.9rem;
+    color: var(--tinta-suave);
+}
+
+/* selo "Professor" no menu */
+.tag-professor {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--tinta);
+    background: var(--amarelo);
+    border: 2px solid var(--tinta);
+}
+
+/* ---------- pódio ---------- */
+.podio {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 18px;
+    margin: 28px 4px 26px;
+    padding: 0;
+    list-style: none;
+}
+.podio li {
+    --faixa: var(--amarelo);
+    position: relative;
+    flex: 1 1 0;
+    max-width: 230px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 18px 12px 14px;
+    text-align: center;
+    background-color: var(--branco);
+    background-image: linear-gradient(var(--faixa), var(--faixa));
+    background-repeat: no-repeat;
+    background-size: 100% 12px;
+    box-shadow: var(--pixel), 6px 6px 0 4px rgba(29, 35, 64, 0.2);
+}
+.podio-1 { --faixa: var(--amarelo); order: 2; min-height: 214px; }
+.podio-2 { --faixa: #b8c2d4;       order: 1; min-height: 180px; }
+.podio-3 { --faixa: #d98a4a;       order: 3; min-height: 160px; }
+.podio-voce { background-color: var(--amarelo-claro); }
+
+.podio-medalha { width: 64px; height: 85px; image-rendering: pixelated; }
+.podio-1 .podio-medalha { width: 76px; height: 101px; }
+.podio-nome { font-size: 1.1rem; line-height: 1.25; overflow-wrap: anywhere; }
+.podio-xp {
+    font-family: var(--fonte-pixel);
+    font-size: 0.8rem;
+    line-height: 1.8;
+    color: var(--roxo);
+}
+.podio-lugar {
+    margin-top: auto;
+    padding: 0 12px;
+    font-family: var(--fonte-pixel);
+    font-size: 1.1rem;
+    line-height: 1.8;
+    color: var(--amarelo);
+    background: var(--tinta);
+}
+
+/* ---------- tabela (visual de boletim antigo) ---------- */
+.tabela-wrap {
+    margin: 22px 4px 8px;
+    overflow-x: auto;
+    background: var(--branco);
+    box-shadow: var(--pixel), 6px 6px 0 4px rgba(29, 35, 64, 0.2);
+}
+.tabela-wrap:focus-visible {
+    outline: 4px solid var(--roxo);
+    outline-offset: 6px;
+}
+.tabela {
+    width: 100%;
+    min-width: 520px;
+    border-collapse: collapse;
+    font-size: 1rem;
+}
+.tabela th,
+.tabela td {
+    padding: 11px 14px;
+    text-align: left;
+    vertical-align: middle;
+}
+.tabela thead th {
+    font-size: 0.88rem;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--amarelo);
+    background: var(--tinta);
+    white-space: nowrap;
+}
+.tabela tbody tr {
+    border-bottom: 2px dashed rgba(29, 35, 64, 0.25);
+}
+.tabela tbody tr:nth-child(even) {
+    background: var(--papel);
+}
+.tabela .num {
+    text-align: right;
+    white-space: nowrap;
+}
+.tabela .pos {
+    white-space: nowrap;
+    font-weight: 700;
+}
+.pos-medalha {
+    width: 18px;
+    height: 24px;
+    margin-right: 6px;
+    vertical-align: middle;
+    image-rendering: pixelated;
+}
+.tabela .linha-voce {
+    background: var(--amarelo-claro);
+    box-shadow: inset 6px 0 0 var(--laranja);
+    font-weight: 700;
+}
+.tag-voce {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--branco);
+    background: var(--roxo);
+}
+.email-aluno {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--tinta-suave);
+}
+
+/* selos de situação (pontos de atenção) */
+.selo {
+    display: inline-block;
+    padding: 2px 10px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    white-space: nowrap;
+    color: var(--tinta);
+    border: 2px solid var(--tinta);
+}
+.selo-bom     { background: var(--verde-claro); }
+.selo-medio   { background: var(--amarelo-claro); }
+.selo-atencao { background: #ffd9cf; }
+.selo-neutro  { background: var(--papel-escuro); }
+
+/* resumo da turma */
+.resumo-turma {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin: 22px 4px 20px;
+}
+
+@media (max-width: 760px) {
+    .escolha-perfil { grid-template-columns: 1fr; }
+    .podio { gap: 8px; }
+    .podio li { padding: 14px 6px 10px; }
+    .podio-nome { font-size: 0.92rem; }
+    .podio-medalha, .podio-1 .podio-medalha { width: 48px; height: 64px; }
+    .resumo-turma { grid-template-columns: repeat(2, 1fr); }
+}

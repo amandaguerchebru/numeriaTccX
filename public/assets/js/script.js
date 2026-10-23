@@ -41,4 +41,67 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (e) { /* ignora */ }
         });
     });
+
+    // ------------------------------------------------------------
+    // Dicas do Bicó: uma dica por vez, sem entregar a resposta
+    // ------------------------------------------------------------
+    document.querySelectorAll('[data-dicas]').forEach((caixa) => {
+        const botao = caixa.querySelector('[data-dica-btn]');
+        const itens = caixa.querySelectorAll('.dica-lista li');
+        const total = itens.length;
+        let mostradas = 0;
+
+        if (!botao || total === 0) {
+            return;
+        }
+
+        botao.addEventListener('click', () => {
+            if (mostradas >= total) {
+                return;
+            }
+
+            itens[mostradas].hidden = false;
+            mostradas++;
+
+            if (mostradas >= total) {
+                botao.textContent = 'Acabaram as dicas. Você consegue!';
+                botao.disabled = true;
+            } else {
+                botao.textContent = 'Pedir outra dica (' + mostradas + '/' + total + ')';
+            }
+        });
+    });
+
+    // ------------------------------------------------------------
+    // Confirmação antes de abandonar uma partida
+    // ------------------------------------------------------------
+    document.querySelectorAll('[data-confirmar]').forEach((link) => {
+        link.addEventListener('click', (evento) => {
+            if (!window.confirm(link.dataset.confirmar)) {
+                evento.preventDefault();
+            }
+        });
+    });
+
+    // ------------------------------------------------------------
+    // Cadastro: o código de professor só aparece para professores
+    // ------------------------------------------------------------
+    const campoProfessor = document.querySelector('[data-campo-professor]');
+    const opcoesTipo = document.querySelectorAll('input[name="tipo"]');
+
+    if (campoProfessor && opcoesTipo.length > 0) {
+        const entrada = campoProfessor.querySelector('input');
+
+        const atualizarCampo = () => {
+            const professor = document.querySelector('input[name="tipo"]:checked').value === 'professor';
+            campoProfessor.hidden = !professor;
+            entrada.required = professor;
+            if (!professor) {
+                entrada.value = '';
+            }
+        };
+
+        opcoesTipo.forEach((opcao) => opcao.addEventListener('change', atualizarCampo));
+        atualizarCampo();
+    }
 });

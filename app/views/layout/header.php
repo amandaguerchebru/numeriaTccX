@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="<?php echo asset('assets/css/style.css'); ?>">
 </head>
 
-<body>
+<body<?php if (in_array($pagina ?? '', ['batalha', 'desafio', 'guardiao', 'dupla'], true)): ?> class="tema-batalha"<?php endif; ?>>
     <a href="#conteudo" class="pular-conteudo">Pular para o conteúdo</a>
     <header>
         <div class="container brand">
@@ -28,8 +28,13 @@
                 <a href="?pagina=home">Início</a>
                 <a href="?pagina=home#jogos">Jogos</a>
                 <?php if (isset($_SESSION['aluno_id'])): ?>
-                    <a href="?pagina=historico">Meu Desempenho</a>
-                    <span class="nav-aluno-ola">Olá, <strong><?php echo htmlspecialchars($_SESSION['aluno_nome'] ?? 'Aventureiro', ENT_QUOTES, 'UTF-8'); ?></strong></span>
+                    <?php if (($_SESSION['aluno_tipo'] ?? 'aluno') === 'professor'): ?>
+                        <a href="?pagina=professor">Painel do Professor</a>
+                    <?php else: ?>
+                        <a href="?pagina=historico">Meu Desempenho</a>
+                    <?php endif; ?>
+                    <a href="?pagina=ranking">Ranking</a>
+                    <span class="nav-aluno-ola">Olá, <strong><?php echo htmlspecialchars($_SESSION['aluno_nome'] ?? 'Aventureiro', ENT_QUOTES, 'UTF-8'); ?></strong><?php if (($_SESSION['aluno_tipo'] ?? 'aluno') === 'professor'): ?> <span class="tag-professor">Professor</span><?php endif; ?></span>
                     <a href="?pagina=sair" class="nav-conta nav-sair">Sair</a>
                 <?php else: ?>
                     <a href="?pagina=login" class="nav-conta">Entrar</a>

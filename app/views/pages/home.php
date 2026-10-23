@@ -92,6 +92,41 @@ if (isset($_SESSION['aluno_id'])) {
             </p>
         </section>
 
+        <!-- ======================================
+             APRESENTAÇÃO DO BICÓ
+             ====================================== -->
+        <section class="apresentacao-bico" aria-labelledby="bico-titulo">
+            <div class="bico-retrato" aria-hidden="true">
+                <span class="bico-grande"></span>
+                <span class="bico-plaquinha">Bicó</span>
+            </div>
+
+            <div class="bico-texto">
+                <span class="badge">Conheça o mascote</span>
+                <h2 id="bico-titulo">Oi! Eu sou o Bicó</h2>
+                <p class="bico-balao">
+                    Sou um tucano bruxo do Reino de Numéria. Cuido da floresta, do
+                    laboratório de poções e, principalmente, de você! Minha missão
+                    é fazer a matemática ficar divertida enquanto você aprende.
+                </p>
+
+                <ul class="bico-poderes">
+                    <li>
+                        <strong>Dicas em etapas</strong>
+                        <span>Em qualquer jogo eu ajudo um passinho de cada vez, sem contar a resposta.</span>
+                    </li>
+                    <li>
+                        <strong>Explico cada erro</strong>
+                        <span>Errou? Eu mostro como resolver, na hora e com calma.</span>
+                    </li>
+                    <li>
+                        <strong>Tudo bem errar!</strong>
+                        <span>Cada tentativa é um treino. Eu comemoro seu progresso com você.</span>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
         <section id="jogos" aria-labelledby="jogos-titulo" style="margin-top: 32px;">
             <h2 id="jogos-titulo">Jogos disponíveis</h2>
 

@@ -452,10 +452,18 @@ if ($partidaAtiva) {
 
         <?php if ($mensagem !== ''): ?>
             <div role="status" class="feedback-msg <?= ($mensagemTipo === 'acerto') ? 'feedback-sucesso' : 'feedback-erro' ?>">
-                <p><strong><?= htmlspecialchars($mensagem, ENT_QUOTES, 'UTF-8') ?></strong></p>
-                <?php if ($explicacao !== ''): ?>
-                    <p class="explicacao"><?= htmlspecialchars($explicacao, ENT_QUOTES, 'UTF-8') ?></p>
-                <?php endif; ?>
+                <div class="bico-feedback">
+                    <span class="bico-icone" aria-hidden="true"></span>
+                    <div>
+                        <p><strong><?= htmlspecialchars($mensagem, ENT_QUOTES, 'UTF-8') ?></strong></p>
+                        <?php if ($explicacao !== ''): ?>
+                            <p class="explicacao">
+                                <strong>Bicó explica:</strong>
+                                <?= htmlspecialchars($explicacao, ENT_QUOTES, 'UTF-8') ?>
+                            </p>
+                        <?php endif; ?>
+                    </div>
+                </div>
             </div>
         <?php endif; ?>
 
@@ -463,6 +471,11 @@ if ($partidaAtiva) {
 
             <article class="card">
                 <h3>Configurar Partida em Dupla</h3>
+                <div class="escolha-lutadores" aria-hidden="true">
+                    <span class="mini-sprite grande sprite-bico"></span>
+                    <span class="arena-vs">VS</span>
+                    <span class="mini-sprite grande sprite-onca"></span>
+                </div>
                 <p>O <strong>Jogador 1</strong> é o aluno conectado. O <strong>Jogador 2</strong> joga como convidado local.</p>
 
                 <?php
@@ -477,14 +490,14 @@ if ($partidaAtiva) {
                 <form method="POST">
                     <div style="margin-bottom: 16px;">
                         <label>
-                            <strong>Jogador 1 (Você - Caçador):</strong><br>
+                            <strong>Jogador 1 (Você - Bicó):</strong><br>
                             <input type="text" value="<?= htmlspecialchars($_SESSION['aluno_nome'] ?? 'Jogador 1', ENT_QUOTES, 'UTF-8') ?>" disabled>
                         </label>
                     </div>
 
                     <div style="margin-bottom: 16px;">
                         <label for="apelido_jogador2">
-                            <strong>Jogador 2 (Convidado - Monstrinho):</strong><br>
+                            <strong>Jogador 2 (Convidado - Onça):</strong><br>
                             <input
                                 type="text"
                                 name="apelido_jogador2"
@@ -527,7 +540,7 @@ if ($partidaAtiva) {
 
                 <div class="grid" style="margin-top: 20px;">
                     <article class="card">
-                        <h4>🏹 <?= htmlspecialchars($nomeP1, ENT_QUOTES, 'UTF-8') ?> (Jogador 1)</h4>
+                        <h4><span class="mini-sprite sprite-bico" role="img" aria-label="Bicó"></span> <?= htmlspecialchars($nomeP1, ENT_QUOTES, 'UTF-8') ?> (Jogador 1)</h4>
                         <p>Questões: <?= (int) $_SESSION['dupla_p1_questoes'] ?> de 10</p>
                         <p>Acertos: <strong><?= (int) $_SESSION['dupla_p1_acertos'] ?></strong></p>
                         <p>Erros: <?= (int) $_SESSION['dupla_p1_erros'] ?></p>
@@ -535,7 +548,7 @@ if ($partidaAtiva) {
                     </article>
 
                     <article class="card">
-                        <h4>🐾 <?= htmlspecialchars($nomeP2, ENT_QUOTES, 'UTF-8') ?> (Jogador 2)</h4>
+                        <h4><span class="mini-sprite sprite-onca" role="img" aria-label="Onça"></span> <?= htmlspecialchars($nomeP2, ENT_QUOTES, 'UTF-8') ?> (Jogador 2)</h4>
                         <p>Questões: <?= (int) $_SESSION['dupla_p2_questoes'] ?> de 10</p>
                         <p>Acertos: <strong><?= (int) $_SESSION['dupla_p2_acertos'] ?></strong></p>
                         <p>Erros: <?= (int) $_SESSION['dupla_p2_erros'] ?></p>
@@ -554,29 +567,40 @@ if ($partidaAtiva) {
             <?php
             $turno = (int) ($_SESSION['dupla_turno'] ?? 1);
             $nomeAtual = ($turno === 1) ? $nomeP1 : $nomeP2;
-            $papelAtual = ($turno === 1) ? '🏹 Caçador (Jogador 1)' : '🐾 Monstrinho (Jogador 2)';
+            $papelAtual = ($turno === 1) ? 'Bicó (Jogador 1)' : 'Onça (Jogador 2)';
             ?>
 
-            <!-- Placar em tempo real -->
-            <div class="grid" style="margin-bottom: 24px;">
-                <article class="card <?= ($turno === 1) ? 'turno-ativo' : '' ?>">
-                    <h4>🏹 <?= htmlspecialchars($nomeP1, ENT_QUOTES, 'UTF-8') ?></h4>
-                    <p>Questões: <?= (int) $_SESSION['dupla_p1_questoes'] ?>/10</p>
-                    <p>Acertos: <strong><?= (int) $_SESSION['dupla_p1_acertos'] ?></strong> | XP: <?= (int) $_SESSION['dupla_p1_xp'] ?></p>
-                    <?php if ($turno === 1): ?>
-                        <span class="badge">SUA VEZ DE JOGAR</span>
-                    <?php endif; ?>
-                </article>
+            <!-- Arena: Bicó x Onça -->
+            <section class="arena arena-dupla" aria-label="Placar da batalha em dupla">
+                <div class="arena-lutadores">
+                    <?php
+                    $lt_tipo = 'bico';
+                    $lt_nome = $nomeP1;
+                    $lt_papel = 'Bicó · Jogador 1';
+                    $lt_vidas = null;
+                    $lt_classe = 'lutador-jogador';
+                    $lt_vez = ($turno === 1);
+                    $lt_extra = '<div class="mini-placar"><span><strong>' . (int) $_SESSION['dupla_p1_acertos'] . '</strong> acertos</span>'
+                        . '<span><strong>' . (int) $_SESSION['dupla_p1_xp'] . '</strong> XP</span>'
+                        . '<span>' . (int) $_SESSION['dupla_p1_questoes'] . '/10 questões</span></div>';
+                    include __DIR__ . '/../partials/lutador.php';
+                    ?>
 
-                <article class="card <?= ($turno === 2) ? 'turno-ativo' : '' ?>">
-                    <h4>🐾 <?= htmlspecialchars($nomeP2, ENT_QUOTES, 'UTF-8') ?></h4>
-                    <p>Questões: <?= (int) $_SESSION['dupla_p2_questoes'] ?>/10</p>
-                    <p>Acertos: <strong><?= (int) $_SESSION['dupla_p2_acertos'] ?></strong> | XP: <?= (int) $_SESSION['dupla_p2_xp'] ?></p>
-                    <?php if ($turno === 2): ?>
-                        <span class="badge">SUA VEZ DE JOGAR</span>
-                    <?php endif; ?>
-                </article>
-            </div>
+                    <div class="arena-vs" aria-hidden="true">VS</div>
+
+                    <?php
+                    $lt_tipo = 'onca';
+                    $lt_nome = $nomeP2;
+                    $lt_papel = 'Onça · Jogador 2';
+                    $lt_classe = 'lutador-guardiao';
+                    $lt_vez = ($turno === 2);
+                    $lt_extra = '<div class="mini-placar"><span><strong>' . (int) $_SESSION['dupla_p2_acertos'] . '</strong> acertos</span>'
+                        . '<span><strong>' . (int) $_SESSION['dupla_p2_xp'] . '</strong> XP</span>'
+                        . '<span>' . (int) $_SESSION['dupla_p2_questoes'] . '/10 questões</span></div>';
+                    include __DIR__ . '/../partials/lutador.php';
+                    ?>
+                </div>
+            </section>
 
             <div class="destaque-turno" style="margin-bottom: 16px;">
                 <h3>Vez de <?= htmlspecialchars($nomeAtual, ENT_QUOTES, 'UTF-8') ?> (<?= $papelAtual ?>)</h3>
@@ -586,6 +610,7 @@ if ($partidaAtiva) {
                 <article class="card">
                     <h3><?= htmlspecialchars($questao['enunciado'], ENT_QUOTES, 'UTF-8') ?></h3>
 
+                    <?php include __DIR__ . '/../partials/dica_bico.php'; ?>
                     <?php if ($alternativas): ?>
                         <form method="POST">
                             <input type="hidden" name="id_questao" value="<?= (int) $questao['id_questao'] ?>">
@@ -616,7 +641,7 @@ if ($partidaAtiva) {
             <?php endif; ?>
 
             <p style="margin-top: 24px;">
-                <a href="?pagina=abandonar_dupla" class="btn btn-secondary">
+                <a href="?pagina=abandonar_dupla" class="btn btn-secondary" data-confirmar="Quer mesmo abandonar a partida em dupla?">
                     Abandonar partida em dupla e voltar aos modos
                 </a>
             </p>

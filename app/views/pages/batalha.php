@@ -14,7 +14,7 @@
         <div class="grid">
             <article class="card">
                 <h3>Desafio</h3>
-                <p>Resolva o máximo de questões em 3 minutos.</p>
+                <p>Resolva o máximo de questões em <?= (int) (DESAFIO_DURACAO / 60) ?> minutos.</p>
                 <a href="?pagina=desafio&novo=1" class="btn">
                     Jogar Desafio
                 </a>

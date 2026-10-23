@@ -21,7 +21,10 @@ $paginasPermitidas = [
     'dupla',
     'abandonar_guardiao',
     'abandonar_dupla',
-    'abandonar_pocoes'
+    'abandonar_pocoes',
+    'abandonar_desafio',
+    'ranking',
+    'professor'
 ];
 
 // VALIDAR A ROTA SOLICITADA
@@ -40,7 +43,9 @@ if (
             'desafio',
             'guardiao',
             'dupla',
-            'historico'
+            'historico',
+            'ranking',
+            'professor'
         ],
         true
     )
@@ -51,6 +56,15 @@ if (
 }
 
 
+
+// PAINEL DO PROFESSOR: só para contas de professor
+if (
+    $pagina === 'professor'
+    && ($_SESSION['aluno_tipo'] ?? 'aluno') !== 'professor'
+) {
+    header('Location: ?pagina=home');
+    exit;
+}
 
 // ENCERRAR SESSÃO
 if ($pagina === 'sair') {
@@ -79,8 +93,8 @@ if ($pagina === 'finalizar_desafio') {
         exit('Partida não encontrada.');
     }
 
-    // Confirma que os 180 segundos já passaram.
-    if (time() - (int) $_SESSION['desafio_inicio'] < 180) {
+    // Confirma que o tempo do desafio já passou.
+    if (time() - (int) $_SESSION['desafio_inicio'] < DESAFIO_DURACAO) {
         http_response_code(400);
         exit('O tempo da partida ainda não terminou.');
     }
@@ -129,6 +143,49 @@ if ($pagina === 'finalizar_desafio') {
 
     http_response_code(403);
     exit('Não foi possível finalizar esta partida.');
+}
+
+// ABANDONAR O DESAFIO
+if ($pagina === 'abandonar_desafio') {
+    if (empty($_SESSION['aluno_id'])) {
+        http_response_code(403);
+        exit('É necessário entrar na conta para abandonar esta partida.');
+    }
+
+    if (!empty($_SESSION['desafio_partida_id'])) {
+        require_once __DIR__ . '/../app/config/conexao.php';
+
+        $consultaAbandono = $conexao->prepare(
+            "UPDATE partida
+             SET status = 'abandonada',
+                 data_fim = NOW()
+             WHERE id_partida = :partida
+               AND status = 'em_andamento'
+               AND EXISTS (
+                   SELECT 1
+                   FROM partida_participante
+                   WHERE partida_participante.id_partida = partida.id_partida
+                     AND partida_participante.id_aluno = :aluno
+               )"
+        );
+        $consultaAbandono->execute([
+            'partida' => (int) $_SESSION['desafio_partida_id'],
+            'aluno' => (int) $_SESSION['aluno_id']
+        ]);
+    }
+
+    unset(
+        $_SESSION['desafio_partida_id'],
+        $_SESSION['desafio_participante_id'],
+        $_SESSION['desafio_inicio'],
+        $_SESSION['desafio_xp'],
+        $_SESSION['desafio_acertos'],
+        $_SESSION['desafio_erros'],
+        $_SESSION['desafio_questao_atual']
+    );
+
+    header('Location: ?pagina=batalha');
+    exit;
 }
 
 // ABANDONAR CONTRA O GUARDIÃO
