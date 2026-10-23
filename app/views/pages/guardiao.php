@@ -691,7 +691,7 @@ if ($partidaAtiva) {
                         'aluno' => $idAluno
                     ]);
 
-                    $fimResposta = $novasVidasJogador <= 0 || $novoTotalQuestoes >= 0;
+                    $fimResposta = $novasVidasJogador <= 0 || $novoTotalQuestoes >= 10;
                     $idProximaQuestao = null;
 
                     if (!$fimResposta) {
@@ -764,10 +764,6 @@ if ($partidaAtiva) {
                             ? 'Resposta correta! O Guardião foi atingido e você ganhou ' . $xpGanho . ' XP!'
                             : 'Ops, talvez não seja essa a resposta correta… Você perdeu uma vida, mas tudo bem errar!';
                     }
-
-                    $mensagem = $acertouResposta
-                        ? 'Resposta correta! O Guardião foi atingido e você ganhou ' . $xpGanho . ' XP!'
-                        : 'Ops, talvez não seja essa a resposta correta… Você perdeu uma vida, mas tudo bem errar!';
 
                     $_SESSION['guardiao_tipo'] = $acertouResposta ? 'acerto' : 'erro';
                     unset($_SESSION['guardiao_explicacao']);
