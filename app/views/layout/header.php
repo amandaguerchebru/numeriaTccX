@@ -8,7 +8,7 @@
     <meta name="description" content="Plataforma educacional Numéria">
     
     <!-- FAVICON DO BICÓ FELIZ AQUI: -->
-     <link rel="icon" type="image/png" href="<?php echo asset('assets/img/bico-favicon.png'); ?>">
+     <link rel="icon" type="image/png" href="<?php echo asset('assets/img/bicofavicon.png'); ?>">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
