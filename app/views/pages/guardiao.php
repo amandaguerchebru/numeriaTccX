@@ -538,7 +538,9 @@ if ($partidaAtiva) {
     $xpTotal = (int) $resumo['xp_total'];
     $acertos = (int) $resumo['acertos'];
     $erros = (int) $resumo['erros'];
-    $fimDeJogo = $vidasJogador <= 0 || $totalQuestoes >= 0;
+
+    // CORREÇÃO 1: Utilizando 10 questões e considerando vidas do guardião
+    $fimDeJogo = $vidasJogador <= 0 || $vidasGuardiao <= 0 || $totalQuestoes >= 10;
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['responder']) && !$fimDeJogo) {
         $idQuestaoEnviada = filter_input(
@@ -691,7 +693,8 @@ if ($partidaAtiva) {
                         'aluno' => $idAluno
                     ]);
 
-                    $fimResposta = $novasVidasJogador <= 0 || $novoTotalQuestoes >= 10;
+                    // CORREÇÃO 2: Utilizando limite de 10 questões para permitir o avanço do jogo
+                    $fimResposta = $novasVidasJogador <= 0 || $novasVidasGuardiao <= 0 || $novoTotalQuestoes >= 10;
                     $idProximaQuestao = null;
 
                     if (!$fimResposta) {
@@ -757,6 +760,7 @@ if ($partidaAtiva) {
 
                     $conexao->commit();
 
+                    // CORREÇÃO 3: Lógica limpa de mensagens sem sobrescrita
                     if ($novasVidasGuardiao <= 0) {
                         $mensagem = 'Incrível! Você acertou 3 vezes e derrotou o Guardião Ancestral! Ganhou ' . $xpGanho . ' XP!';
                     } else {
@@ -768,7 +772,6 @@ if ($partidaAtiva) {
                     $_SESSION['guardiao_tipo'] = $acertouResposta ? 'acerto' : 'erro';
                     unset($_SESSION['guardiao_explicacao']);
 
-                    // Explicação didática e imediata, só quando erra.
                     if (!$acertouResposta) {
                         $consultaExplicacao = $conexao->prepare(
                             'SELECT explicacao_curta
@@ -852,23 +855,22 @@ if ($partidaAtiva) {
                     'dificuldade' => (int) $estadoBloqueado['id_dificuldade'],
                     'participante' => $idParticipante
                 ]);
-                $idQuestaoAtual = $consultaQuestaoAtual->fetchColumn();
+                $idQuestaoSorteada = $consultaQuestaoAtual->fetchColumn();
 
-                if ($idQuestaoAtual !== false) {
-                    $consultaSalvaQuestao = $conexao->prepare(
+                if ($idQuestaoSorteada !== false) {
+                    $consultaAtualizaQuestao = $conexao->prepare(
                         'UPDATE guardiao_estado
                          SET id_questao_atual = :questao
                          WHERE id_participante = :participante
                            AND id_partida = :partida'
                     );
-                    $consultaSalvaQuestao->execute([
-                        'questao' => (int) $idQuestaoAtual,
+                    $consultaAtualizaQuestao->execute([
+                        'questao' => (int) $idQuestaoSorteada,
                         'participante' => $idParticipante,
                         'partida' => $idPartida
                     ]);
                 }
             }
-
             $conexao->commit();
         } catch (Throwable $e) {
             if ($conexao->inTransaction()) {
@@ -884,239 +886,24 @@ if ($partidaAtiva) {
         $estado = $consultaEstadoAtual->fetch(PDO::FETCH_ASSOC);
     }
 
-    if ($estado['id_questao_atual'] !== null && !$fimDeJogo) {
-        $consultaEnunciado = $conexao->prepare(
-            'SELECT enunciado
+    if ($estado['id_questao_atual'] !== null) {
+        $consultaQuestao = $conexao->prepare(
+            'SELECT id_questao, enunciado
              FROM questao
-             WHERE id_questao = :questao
-               AND id_jogo = 1
-               AND id_dificuldade = :dificuldade
-               AND ativo = 1'
+             WHERE id_questao = :id'
         );
-        $consultaEnunciado->execute([
-            'questao' => (int) $estado['id_questao_atual'],
-            'dificuldade' => (int) $estado['id_dificuldade']
-        ]);
-        $enunciado = $consultaEnunciado->fetchColumn();
+        $consultaQuestao->execute(['id' => (int) $estado['id_questao_atual']]);
+        $questao = $consultaQuestao->fetch(PDO::FETCH_ASSOC);
 
-        if ($enunciado !== false) {
-            $questao = [
-                'id_questao' => (int) $estado['id_questao_atual'],
-                'enunciado' => $enunciado
-            ];
+        if ($questao) {
             $consultaAlternativas = $conexao->prepare(
                 'SELECT id_alternativa, texto
                  FROM alternativa
                  WHERE id_questao = :questao
-                 ORDER BY id_alternativa'
+                 ORDER BY id_alternativa ASC'
             );
-            $consultaAlternativas->execute([
-                'questao' => (int) $estado['id_questao_atual']
-            ]);
+            $consultaAlternativas->execute(['questao' => (int) $questao['id_questao']]);
             $alternativas = $consultaAlternativas->fetchAll(PDO::FETCH_ASSOC);
         }
     }
-
-    $consultaResumo->execute([
-        'participante' => $idParticipante,
-        'partida' => $idPartida,
-        'aluno' => $idAluno
-    ]);
-    $resumo = $consultaResumo->fetch(PDO::FETCH_ASSOC);
-    $xpTotal = (int) $resumo['xp_total'];
-    $acertos = (int) $resumo['acertos'];
-    $erros = (int) $resumo['erros'];
-    $fimDeJogo = $vidasJogador <= 0 || $totalQuestoes >= 10;
-
-    if ($fimDeJogo) {
-        if ($vidasJogador <= 0) {
-            $resultado = 'Fim da batalha! Você perdeu todas as vidas após '
-                . $totalQuestoes . ' desafios.';
-        } elseif ($acertos > $erros) {
-            $resultado = '🏆 Vitória! Você superou os desafios do Guardião da Floresta!';
-        } elseif ($erros > $acertos) {
-            $resultado = '🛡️ Fim da batalha! O Guardião resistiu desta vez, mas você completou os desafios!';
-        } else {
-            $resultado = '🤝 Empate heróico! Você e o Guardião mostraram grande equilíbrio matemático!';
-        }
-    }
 }
-
-?>
-
-<main class="container">
-    <section class="hero">
-        <span class="badge">Batalha na Floresta</span>
-        <h2>Contra o Guardião</h2>
-
-        <?php if ($mensagem !== ''): ?>
-            <div role="status" class="feedback-msg <?= ($mensagemTipo === 'acerto') ? 'feedback-sucesso' : 'feedback-erro' ?>">
-                <div class="bico-feedback">
-                    <span class="bico-icone" aria-hidden="true"></span>
-                    <div>
-                        <p><strong><?= htmlspecialchars($mensagem, ENT_QUOTES, 'UTF-8') ?></strong></p>
-                        <?php if (!empty($explicacaoErro)): ?>
-                            <p class="explicacao">
-                                <strong>Bicó explica:</strong>
-                                <?= htmlspecialchars($explicacaoErro, ENT_QUOTES, 'UTF-8') ?>
-                            </p>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-        <?php endif; ?>
-
-        <?php if ($partidaSemEstado): ?>
-
-            <p>
-                Há uma partida antiga em andamento sem estado recuperável.
-                Ela não foi substituída; conclua ou abandone essa partida antes de iniciar outra.
-            </p>
-            <a
-                href="?pagina=abandonar_guardiao&id_partida=<?= $partidaLegadaId ?>"
-                class="btn btn-secondary">
-                Abandonar esta partida antiga
-            </a>
-
-        <?php elseif (!$partidaAtiva): ?>
-
-            <p>Escolha a dificuldade para iniciar a batalha.</p>
-
-            <?php
-            $consultaDificuldades = $conexao->query(
-                'SELECT id_dificuldade, nome
-                 FROM dificuldade
-                 ORDER BY id_dificuldade'
-            );
-            $dificuldades = $consultaDificuldades->fetchAll(PDO::FETCH_ASSOC);
-            ?>
-
-            <form method="POST">
-                <label for="id_dificuldade">Dificuldade</label>
-                <select name="id_dificuldade" id="id_dificuldade" required>
-                    <option value="">Selecione</option>
-                    <?php foreach ($dificuldades as $dificuldade): ?>
-                        <option value="<?= (int) $dificuldade['id_dificuldade'] ?>">
-                            <?= htmlspecialchars($dificuldade['nome'], ENT_QUOTES, 'UTF-8') ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-
-                <button type="submit" name="iniciar" value="1">
-                    Iniciar batalha
-                </button>
-            </form>
-
-        <?php elseif ($fimDeJogo): ?>
-
-            <h3><?= htmlspecialchars($resultado ?? 'Batalha encerrada', ENT_QUOTES, 'UTF-8') ?></h3>
-
-            <p>Questões respondidas: <?= $totalQuestoes ?> de 10</p>
-            <p>Acertos: <?= $acertos ?></p>
-            <p>Erros: <?= $erros ?></p>
-            <p>XP conquistado: <?= $xpTotal ?></p>
-
-            <a href="?pagina=guardiao&novo=1" class="btn">
-                Jogar novamente
-            </a>
-
-            <a href="?pagina=batalha" class="btn">
-                Voltar aos modos
-            </a>
-
-        <?php else: ?>
-
-            <?php
-            $nomeJogador = $_SESSION['aluno_nome'] ?? 'Jogador';
-            $hudDesafio = min(10, $totalQuestoes + 1);
-            ?>
-            <section class="arena" aria-label="Placar da batalha">
-                <div class="arena-lutadores">
-                    <?php
-                    $lt_tipo = 'bico';
-                    $lt_nome = $nomeJogador;
-                    $lt_papel = 'Bicó guerreiro';
-                    $lt_vidas = $vidasJogador;
-                    $lt_max = 3;
-                    $lt_classe = 'lutador-jogador' . ($mensagemTipo === 'erro' ? ' atingido' : '');
-                    $lt_vez = false;
-                    include __DIR__ . '/../partials/lutador.php';
-                    ?>
-
-                    <div class="arena-vs" aria-hidden="true">VS</div>
-
-                    <?php
-                    $lt_tipo = 'guardiao';
-                    $lt_nome = 'Guardião';
-                    $lt_papel = 'da Floresta';
-                    $lt_vidas = $vidasGuardiao;
-                    $lt_max = 3;
-                    $lt_classe = 'lutador-guardiao' . ($mensagemTipo === 'acerto' ? ' atingido' : '');
-                    include __DIR__ . '/../partials/lutador.php';
-                    ?>
-                </div>
-
-                <div class="desempenho" role="group" aria-label="Seu desempenho nesta batalha">
-                    <div class="medidor">
-                        <span class="medidor-rotulo">Desafio</span>
-                        <strong class="medidor-valor"><?= $hudDesafio ?><small>/10</small></strong>
-                    </div>
-                    <div class="medidor medidor-acerto">
-                        <span class="medidor-rotulo">Acertos</span>
-                        <strong class="medidor-valor"><?= $acertos ?></strong>
-                    </div>
-                    <div class="medidor medidor-erro">
-                        <span class="medidor-rotulo">Erros</span>
-                        <strong class="medidor-valor"><?= $erros ?></strong>
-                    </div>
-                    <div class="medidor medidor-xp">
-                        <span class="medidor-rotulo">XP</span>
-                        <strong class="medidor-valor"><?= $xpTotal ?></strong>
-                    </div>
-                </div>
-
-                <progress value="<?= $totalQuestoes ?>" max="10" aria-label="Progresso da batalha"></progress>
-            </section>
-
-            <?php if ($questao): ?>
-                <article class="card">
-                    <h3><?= htmlspecialchars($questao['enunciado'], ENT_QUOTES, 'UTF-8') ?></h3>
-
-                    <?php include __DIR__ . '/../partials/dica_bico.php'; ?>
-                    <?php if ($alternativas): ?>
-                        <form method="POST">
-                            <input type="hidden" name="id_questao" value="<?= (int) $questao['id_questao'] ?>">
-
-                            <?php foreach ($alternativas as $alternativa): ?>
-                                <label>
-                                    <input
-                                        type="radio"
-                                        name="id_alternativa"
-                                        value="<?= (int) $alternativa['id_alternativa'] ?>"
-                                        required>
-                                    <?= htmlspecialchars($alternativa['texto'], ENT_QUOTES, 'UTF-8') ?>
-                                </label>
-                                <br>
-                            <?php endforeach; ?>
-
-                            <button type="submit" name="responder" value="1">
-                                Responder
-                            </button>
-                        </form>
-                    <?php else: ?>
-                        <p>Esta questão não possui alternativas.</p>
-                    <?php endif; ?>
-                </article>
-            <?php else: ?>
-                <p>Não há uma questão disponível para continuar. Seu progresso foi preservado.</p>
-            <?php endif; ?>
-
-        <?php endif; ?>
-
-        <?php if ($partidaAtiva && !$fimDeJogo): ?>
-            <p><a href="?pagina=abandonar_guardiao&id_partida=<?= $idPartida ?>" class="btn btn-secondary" data-confirmar="Quer mesmo abandonar a batalha? Seu progresso desta partida não será continuado.">Abandonar batalha</a></p>
-        <?php else: ?>
-            <p><a href="?pagina=batalha">Voltar à Batalha na Floresta</a></p>
-        <?php endif; ?>
-    </section>
-</main>
